@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Photo {
+  id               String    @id @default(cuid())
+  originalFilename String
+  storagePath      String
+  source           String
+  takenAt          DateTime?
+  latitude         Float?
+  longitude        Float?
+  country          String?
+  city             String?
+  caption          String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  tags             PhotoTag[]
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  photos    PhotoTag[]
+}
+
+model PhotoTag {
+  photoId String
+  tagId   String
+  photo   Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([photoId, tagId])
+}
