@@ -19,7 +19,7 @@ const emptyFilters = {
   tag: ''
 };
 
-type PhotoListTab = 'all' | 'missing-geolocation';
+type PhotoListTab = 'all' | 'missing-geolocation' | 'by-location';
 
 export function HomePage() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
@@ -34,6 +34,8 @@ export function HomePage() {
   const dragCounter = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [photoListTab, setPhotoListTab] = useState<PhotoListTab>('all');
+  const [locationCountry, setLocationCountry] = useState('');
+  const [locationCity, setLocationCity] = useState('');
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -48,7 +50,41 @@ export function HomePage() {
     [photos]
   );
 
-  const visiblePhotos = photoListTab === 'missing-geolocation' ? photosWithoutGeolocation : photos;
+  const availableCountries = useMemo(
+    () => Array.from(new Set(photos.map((photo) => photo.country?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b)),
+    [photos]
+  );
+
+  const availableCities = useMemo(() => {
+    if (!locationCountry) return [];
+
+    return Array.from(
+      new Set(
+        photos
+          .filter((photo) => photo.country === locationCountry)
+          .map((photo) => photo.city?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [locationCountry, photos]);
+
+  const locationFilteredPhotos = useMemo(() => {
+    if (!locationCountry || !locationCity) return [];
+    return photos.filter((photo) => photo.country === locationCountry && photo.city === locationCity);
+  }, [locationCity, locationCountry, photos]);
+
+  const visiblePhotos = useMemo(() => {
+    if (photoListTab === 'missing-geolocation') {
+      return photosWithoutGeolocation;
+    }
+
+    if (photoListTab === 'by-location') {
+      return locationFilteredPhotos;
+    }
+
+    return photos;
+  }, [locationFilteredPhotos, photoListTab, photos, photosWithoutGeolocation]);
+
   const selectedPhotosCount = selectedPhotoIds.length;
   const isMultiSelection = selectedPhotosCount > 1;
 
@@ -80,6 +116,18 @@ export function HomePage() {
       }
     }
   }, [photoListTab, photosWithoutGeolocation, selectedPhoto]);
+
+  useEffect(() => {
+    if (locationCountry && !availableCountries.includes(locationCountry)) {
+      setLocationCountry('');
+      setLocationCity('');
+      return;
+    }
+
+    if (locationCity && !availableCities.includes(locationCity)) {
+      setLocationCity('');
+    }
+  }, [availableCities, availableCountries, locationCity, locationCountry]);
 
   function validateFiles(files: File[]) {
     const invalidMime = files.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type));
@@ -569,8 +617,55 @@ export function HomePage() {
               >
                 Without geolocation ({photosWithoutGeolocation.length})
               </button>
+              <button
+                type="button"
+                className={photoListTab === 'by-location' ? '' : 'secondary'}
+                onClick={() => setPhotoListTab('by-location')}
+              >
+                By location ({locationFilteredPhotos.length})
+              </button>
             </div>
-            <div className="small">Click to select one photo. Use Shift + click to select a range and apply the same geo/city/country.</div>
+            {photoListTab === 'by-location' && (
+              <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label>
+                  Country
+                  <select
+                    value={locationCountry}
+                    onChange={(e) => {
+                      setLocationCountry(e.target.value);
+                      setLocationCity('');
+                    }}
+                  >
+                    <option value="">Select a country</option>
+                    {availableCountries.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  City
+                  <select
+                    value={locationCity}
+                    onChange={(e) => setLocationCity(e.target.value)}
+                    disabled={!locationCountry}
+                  >
+                    <option value="">Select a city</option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            <div className="small">
+              {photoListTab === 'by-location'
+                ? 'Choose a country and a city to show only photos from that location.'
+                : 'Click to select one photo. Use Shift + click to select a range and apply the same geo/city/country.'}
+            </div>
             <div className="photo-list">
               {visiblePhotos.map((photo) => {
                 const isSelected = selectedPhotoIds.includes(photo.id);
