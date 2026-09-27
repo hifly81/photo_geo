@@ -26,20 +26,38 @@ export async function GET(request: NextRequest) {
 
   const data = await response.json();
 
-  const results = (Array.isArray(data) ? data : []).map((item: any) => ({
-    id: String(item.place_id),
-    label: item.display_name,
-    city:
+  const results = (Array.isArray(data) ? data : []).map((item: any) => {
+    const city =
       item.address?.city ??
       item.address?.town ??
       item.address?.village ??
       item.address?.municipality ??
       item.address?.county ??
-      '',
-    country: item.address?.country ?? '',
-    latitude: Number(item.lat),
-    longitude: Number(item.lon)
-  }));
+      '';
+
+    const name =
+      item.name ??
+      item.address?.attraction ??
+      item.address?.museum ??
+      item.address?.tourism ??
+      item.address?.building ??
+      item.address?.amenity ??
+      item.address?.shop ??
+      item.address?.leisure ??
+      item.address?.road ??
+      city ??
+      item.display_name;
+
+    return {
+      id: String(item.place_id),
+      label: item.display_name,
+      name,
+      city,
+      country: item.address?.country ?? '',
+      latitude: Number(item.lat),
+      longitude: Number(item.lon)
+    };
+  });
 
   return NextResponse.json({ results });
 }

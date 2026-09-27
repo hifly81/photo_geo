@@ -36,6 +36,7 @@ export function HomePage() {
   const [photoListTab, setPhotoListTab] = useState<PhotoListTab>('all');
   const [locationCountry, setLocationCountry] = useState('');
   const [locationCity, setLocationCity] = useState('');
+  const [placeQuery, setPlaceQuery] = useState('');
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -128,6 +129,10 @@ export function HomePage() {
       setLocationCity('');
     }
   }, [availableCities, availableCountries, locationCity, locationCountry]);
+
+  useEffect(() => {
+    setPlaceQuery(selectedPhoto?.city ?? '');
+  }, [selectedPhoto?.id, selectedPhoto?.city]);
 
   function validateFiles(files: File[]) {
     const invalidMime = files.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type));
@@ -335,6 +340,7 @@ export function HomePage() {
       longitude: result.longitude
     };
 
+    setPlaceQuery(result.name || result.label);
     setSelectedPhoto({
       ...selectedPhoto,
       ...location
@@ -520,20 +526,33 @@ export function HomePage() {
                     onChange={(e) => setSelectedPhoto({ ...selectedPhoto, country: e.target.value })}
                   />
                 </label>
-                <LocationAutocomplete
-                  label="City"
-                  value={selectedPhoto.city ?? ''}
-                  placeholder="Start typing a city or place"
-                  onChange={(value) =>
-                    setSelectedPhoto({
-                      ...selectedPhoto,
-                      city: value,
-                      latitude: null,
-                      longitude: null
-                    })
-                  }
-                  onSelect={applyLocation}
-                />
+                <label style={{ width: '100%' }}>
+                  Place
+                  <LocationAutocomplete
+                    label=""
+                    value={placeQuery}
+                    placeholder="Search a place, museum, landmark, or city"
+                    onChange={(value) => {
+                      setPlaceQuery(value);
+                      setSelectedPhoto({
+                        ...selectedPhoto,
+                        city: value,
+                        latitude: null,
+                        longitude: null
+                      });
+                    }}
+                    onSelect={applyLocation}
+                  />
+                </label>
+              </div>
+              <div className="row">
+                <label style={{ width: '100%' }}>
+                  City
+                  <input
+                    value={selectedPhoto.city ?? ''}
+                    onChange={(e) => setSelectedPhoto({ ...selectedPhoto, city: e.target.value })}
+                  />
+                </label>
               </div>
               <div className="row">
                 <button

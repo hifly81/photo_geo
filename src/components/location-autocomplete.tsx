@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 export type GeocodeResult = {
   id: string;
   label: string;
+  name: string;
   city: string;
   country: string;
   latitude: number;
@@ -80,7 +81,7 @@ export function LocationAutocomplete({
   }, []);
 
   function handleSelect(result: GeocodeResult) {
-    onChange(result.city || result.label);
+    onChange(result.name || result.city || result.label);
     onSelect(result);
     setResults([]);
     setOpen(false);
@@ -152,7 +153,11 @@ export function LocationAutocomplete({
                 style={{ textAlign: 'left', justifyContent: 'flex-start' }}
                 onClick={() => handleSelect(result)}
               >
-                {result.city ? `${result.city}, ${result.country}` : result.label}
+                <span>
+                  <strong>{result.name || result.city || result.country}</strong>
+                  <br />
+                  <span className="small">{result.label}</span>
+                </span>
               </button>
             ))}
           </div>
