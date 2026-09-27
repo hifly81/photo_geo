@@ -19,6 +19,8 @@ const emptyFilters = {
   tag: ''
 };
 
+type PhotoListTab = 'all' | 'missing-geolocation';
+
 export function HomePage() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
@@ -29,6 +31,7 @@ export function HomePage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const dragCounter = useRef(0);
   const [dragging, setDragging] = useState(false);
+  const [photoListTab, setPhotoListTab] = useState<PhotoListTab>('all');
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -37,6 +40,13 @@ export function HomePage() {
     });
     return params.toString();
   }, [filters]);
+
+  const photosWithoutGeolocation = useMemo(
+    () => photos.filter((photo) => photo.latitude == null || photo.longitude == null),
+    [photos]
+  );
+
+  const visiblePhotos = photoListTab === 'missing-geolocation' ? photosWithoutGeolocation : photos;
 
   async function loadPhotos() {
     const response = await fetch(`/api/photos${query ? `?${query}` : ''}`);
@@ -52,6 +62,15 @@ export function HomePage() {
     void loadPhotos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
+
+  useEffect(() => {
+    if (photoListTab === 'missing-geolocation' && selectedPhoto?.latitude != null && selectedPhoto?.longitude != null) {
+      const stillMissing = photosWithoutGeolocation.some((photo) => photo.id === selectedPhoto.id);
+      if (!stillMissing) {
+        setSelectedPhoto((current) => (current?.id === selectedPhoto.id ? null : current));
+      }
+    }
+  }, [photoListTab, photosWithoutGeolocation, selectedPhoto]);
 
   function validateFiles(files: File[]) {
     const invalidMime = files.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type));
@@ -418,7 +437,7 @@ export function HomePage() {
           <section className="card stack">
             <h2>Map</h2>
             <div className="map-wrap">
-              <PhotoMap photos={photos} selectedPhoto={selectedPhoto} onSelectPhoto={setSelectedPhoto} onPickLocation={(lat, lng) => {
+              <PhotoMap photos={visiblePhotos} selectedPhoto={selectedPhoto} onSelectPhoto={setSelectedPhoto} onPickLocation={(lat, lng) => {
                 if (!selectedPhoto) return;
                 setSelectedPhoto({ ...selectedPhoto, latitude: lat, longitude: lng });
               }} />
@@ -426,12 +445,28 @@ export function HomePage() {
           </section>
 
           <section className="card stack">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ margin: 0 }}>Photos</h2>
-              <span className="small">{photos.length} result(s)</span>
+              <span className="small">{visiblePhotos.length} result(s)</span>
+            </div>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={photoListTab === 'all' ? '' : 'secondary'}
+                onClick={() => setPhotoListTab('all')}
+              >
+                All photos ({photos.length})
+              </button>
+              <button
+                type="button"
+                className={photoListTab === 'missing-geolocation' ? '' : 'secondary'}
+                onClick={() => setPhotoListTab('missing-geolocation')}
+              >
+                Without geolocation ({photosWithoutGeolocation.length})
+              </button>
             </div>
             <div className="photo-list">
-              {photos.map((photo) => (
+              {visiblePhotos.map((photo) => (
                 <article
                   key={photo.id}
                   className="photo-card card"
