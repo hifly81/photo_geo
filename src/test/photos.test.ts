@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageContentTypeFromPath } from '@/lib/photos';
+import { imageContentTypeFromPath } from '../lib/photos';
 
 test('imageContentTypeFromPath resolves common image types', () => {
   assert.equal(imageContentTypeFromPath('photo.jpg'), 'image/jpeg');

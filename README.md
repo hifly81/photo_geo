@@ -18,13 +18,14 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Dedicated photo detail page
 - View geolocated photos on a Leaflet map
 - Placeholder import provider layer for Google Photos / Amazon Photos
-- Basic API tests for core routes
+- Basic API and utility tests for core routes/helpers
+- Backfill script for legacy `fileHash` values
 
 ## Tech stack
 
 - Next.js 15 + App Router + TypeScript
 - Prisma + SQLite
-- Leaflet + React Leaflet
+- Leaflet
 - Zod for validation
 - EXIF parsing with `exifr`
 - Node test runner for API-focused tests
@@ -36,8 +37,9 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - `src/lib` – database, validation, EXIF, storage helpers
 - `src/providers` – placeholder provider connectors for future Google Photos / Amazon Photos support
 - `src/types` – shared frontend types
-- `src/test` – basic API and utility tests
+- `src/test` – API and utility tests
 - `prisma` – schema and local SQLite database
+- `scripts` – maintenance scripts such as hash backfill
 - `uploads` – local file storage for uploaded images
 
 ## Setup
@@ -48,32 +50,38 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 npm install
 ```
 
-2. Create the database:
+2. Create/update the database:
 
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-3. Optional: load demo data
+3. Optional: backfill missing hashes for existing photos
+
+```bash
+npm run backfill:filehash
+```
+
+4. Optional: load demo data
 
 ```bash
 npm run seed
 ```
 
-4. Start the app:
+5. Start the app:
 
 ```bash
 npm run dev
 ```
 
-5. Run tests:
+6. Run tests:
 
 ```bash
 npm test
 ```
 
-6. Open the app at `http://localhost:3000`
+7. Open the app at `http://localhost:3000`
 
 ## Notes
 

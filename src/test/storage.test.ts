@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateFileHash } from '@/lib/storage';
+import { calculateFileHash } from '../lib/storage';
 
 test('calculateFileHash returns stable sha256 hashes', () => {
   const a = calculateFileHash(Buffer.from('hello'));

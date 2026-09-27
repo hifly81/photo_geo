@@ -1,6 +1,6 @@
 {
   "name": "photo_geo",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "seed": "node prisma/seed.mjs",
-    "test": "node --test"
+    "backfill:filehash": "node scripts/backfill-filehash.mjs",
+    "test": "node --test --import ./src/test/register-alias.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

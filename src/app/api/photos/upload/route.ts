@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { saveUploadedFile, writeBufferToTempFile, cleanupTempFile, calculateFileHash } from '@/lib/storage';
+import { saveUploadedFile, writeBufferToTempFile, cleanupTempFile, calculateFileHash, deleteStoredFileByRelativePath } from '@/lib/storage';
 import { extractPhotoMetadata } from '@/lib/exif';
 import { uploadConstraints } from '@/lib/validators';
 
@@ -46,9 +46,10 @@ export async function POST(request: NextRequest) {
       }
 
       const tempPath = await writeBufferToTempFile(buffer, file.name);
+      let stored: Awaited<ReturnType<typeof saveUploadedFile>> | null = null;
 
       try {
-        const stored = await saveUploadedFile(tempPath, file.name);
+        stored = await saveUploadedFile(tempPath, file.name);
         const metadata = await extractPhotoMetadata(stored.absolutePath);
 
         const photo = await prisma.photo.create({
@@ -71,6 +72,11 @@ export async function POST(request: NextRequest) {
         });
 
         createdPhotos.push(photo);
+      } catch (error) {
+        if (stored) {
+          await deleteStoredFileByRelativePath(stored.relativePath);
+        }
+        throw error;
       } finally {
         await cleanupTempFile(tempPath);
       }
