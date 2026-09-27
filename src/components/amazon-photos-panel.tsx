@@ -81,11 +81,11 @@ export function AmazonPhotosPanel() {
   }
 
   if (loading) {
-    return <section className="card">Loading Amazon Photos…</section>;
+    return <div className="stack"><strong>Amazon Photos</strong><p className="small">Loading…</p></div>;
   }
 
   return (
-    <section className="card stack">
+    <div className="stack" style={{ paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ marginBottom: 4 }}>Amazon Photos</h3>
@@ -139,6 +139,6 @@ export function AmazonPhotosPanel() {
       ) : (
         <p className="small">Amazon Photos is not connected yet.</p>
       )}
-    </section>
+    </div>
   );
 }

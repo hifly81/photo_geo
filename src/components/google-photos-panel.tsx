@@ -83,11 +83,11 @@ export function GooglePhotosPanel() {
   }
 
   if (loading) {
-    return <section className="card">Loading Google Photos…</section>;
+    return <div className="stack"><strong>Google Photos</strong><p className="small">Loading…</p></div>;
   }
 
   return (
-    <section className="card stack">
+    <div className="stack" style={{ paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ marginBottom: 4 }}>Google Photos</h3>
@@ -141,6 +141,6 @@ export function GooglePhotosPanel() {
       ) : (
         <p className="small">Google Photos is not connected yet.</p>
       )}
-    </section>
+    </div>
   );
 }

@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { HomePage } from '@/components/home-page';
 import { LogoutButton } from '@/components/logout-button';
-import { GooglePhotosPanel } from '@/components/google-photos-panel';
-import { AmazonPhotosPanel } from '@/components/amazon-photos-panel';
+import { IntegrationsPanel } from '@/components/integrations-panel';
 import { getCurrentUser } from '@/lib/auth';
 
 export default async function Page() {
@@ -28,8 +27,7 @@ export default async function Page() {
         </nav>
       </header>
       <main className="container stack">
-        <GooglePhotosPanel />
-        <AmazonPhotosPanel />
+        <IntegrationsPanel />
       </main>
       <HomePage />
     </>
