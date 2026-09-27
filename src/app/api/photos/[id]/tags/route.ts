@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { photoTagSchema } from '@/lib/validators';
+import { removeOrphanTags } from '@/lib/photos';
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -59,6 +60,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       tagId: tag.id
     }
   });
+
+  await removeOrphanTags();
 
   return NextResponse.json({ ok: true });
 }

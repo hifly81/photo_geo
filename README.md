@@ -4,7 +4,7 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 
 ## Features
 
-- Upload photos from local file system
+- Upload one or more photos from local file system
 - Store files on the server in `uploads/`
 - Extract EXIF metadata when available
 - Save photo records with Prisma + SQLite

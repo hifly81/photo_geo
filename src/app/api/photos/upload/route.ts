@@ -1,56 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { saveUploadedFile, writeBufferToTempFile } from '@/lib/storage';
+import { saveUploadedFile, writeBufferToTempFile, cleanupTempFile } from '@/lib/storage';
 import { extractPhotoMetadata } from '@/lib/exif';
 
 export const runtime = 'nodejs';
 
 async function parseFormData(request: NextRequest) {
   const formData = await request.formData();
-  const file = formData.get('file');
+  const files = formData.getAll('files');
 
-  if (!(file instanceof File)) {
-    throw new Error('No file uploaded');
+  if (!files.length) {
+    throw new Error('No files uploaded');
   }
 
-  if (!file.type.startsWith('image/')) {
+  const imageFiles = files.filter((file): file is File => file instanceof File && file.type.startsWith('image/'));
+
+  if (!imageFiles.length) {
     throw new Error('Only image uploads are supported');
   }
 
-  return file;
+  return imageFiles;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const file = await parseFormData(request);
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const files = await parseFormData(request);
+    const createdPhotos = [];
 
-    const tempPath = await writeBufferToTempFile(buffer, file.name);
-    const stored = await saveUploadedFile(tempPath, file.name);
-    const metadata = await extractPhotoMetadata(stored.absolutePath);
+    for (const file of files) {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const tempPath = await writeBufferToTempFile(buffer, file.name);
 
-    await import('node:fs/promises').then((fs) => fs.unlink(tempPath).catch(() => null));
+      try {
+        const stored = await saveUploadedFile(tempPath, file.name);
+        const metadata = await extractPhotoMetadata(stored.absolutePath);
 
-    const photo = await prisma.photo.create({
-      data: {
-        originalFilename: file.name,
-        storagePath: stored.relativePath,
-        source: 'upload',
-        takenAt: metadata.takenAt,
-        latitude: metadata.latitude,
-        longitude: metadata.longitude
-      },
-      include: {
-        tags: {
+        const photo = await prisma.photo.create({
+          data: {
+            originalFilename: file.name,
+            storagePath: stored.relativePath,
+            source: 'upload',
+            takenAt: metadata.takenAt,
+            latitude: metadata.latitude,
+            longitude: metadata.longitude
+          },
           include: {
-            tag: true
+            tags: {
+              include: {
+                tag: true
+              }
+            }
           }
-        }
-      }
-    });
+        });
 
-    return NextResponse.json({ photo }, { status: 201 });
+        createdPhotos.push(photo);
+      } finally {
+        await cleanupTempFile(tempPath);
+      }
+    }
+
+    return NextResponse.json({ photos: createdPhotos }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       {

@@ -57,3 +57,23 @@ export function imageContentTypeFromPath(storagePath: string) {
   if (normalized.endsWith('.jpeg') || normalized.endsWith('.jpg')) return 'image/jpeg';
   return 'application/octet-stream';
 }
+
+export async function removeOrphanTags() {
+  const tags = await prisma.tag.findMany({
+    include: {
+      photos: true
+    }
+  });
+
+  const orphanIds = tags.filter((tag) => tag.photos.length === 0).map((tag) => tag.id);
+
+  if (orphanIds.length > 0) {
+    await prisma.tag.deleteMany({
+      where: {
+        id: {
+          in: orphanIds
+        }
+      }
+    });
+  }
+}

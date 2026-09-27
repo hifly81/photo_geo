@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getPhoto } from '@/lib/photos';
+import { getPhoto, removeOrphanTags } from '@/lib/photos';
 import { updatePhotoSchema } from '@/lib/validators';
 import { deleteStoredFileByRelativePath } from '@/lib/storage';
 
@@ -61,8 +61,13 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
   }
 
-  await prisma.photo.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.photoTag.deleteMany({ where: { photoId: id } });
+    await tx.photo.delete({ where: { id } });
+  });
+
   await deleteStoredFileByRelativePath(existing.storagePath);
+  await removeOrphanTags();
 
   return NextResponse.json({ ok: true });
 }

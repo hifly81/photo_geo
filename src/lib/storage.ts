@@ -43,3 +43,7 @@ export async function deleteStoredFileByRelativePath(relativePath: string) {
   const absolutePath = resolveStoredFilePath(filename);
   await fs.unlink(absolutePath).catch(() => null);
 }
+
+export async function cleanupTempFile(tempPath: string) {
+  await fs.unlink(tempPath).catch(() => null);
+}

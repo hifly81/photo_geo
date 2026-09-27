@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { PhotoRecord } from '@/types/photo';
 
@@ -23,6 +23,9 @@ export function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [tagName, setTagName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const dragCounter = useRef(0);
+  const [dragging, setDragging] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -47,24 +50,21 @@ export function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function uploadFiles(files: FileList | File[]) {
     setError(null);
-    const form = event.currentTarget;
-    const input = form.elements.namedItem('file') as HTMLInputElement;
-    if (!input.files?.[0]) return;
+    setSuccessMessage(null);
 
-    const file = input.files[0];
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file.');
+    const validFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (validFiles.length === 0) {
+      setError('Please select at least one image file.');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     setUploading(true);
     try {
+      const formData = new FormData();
+      validFiles.forEach((file) => formData.append('files', file));
+
       const response = await fetch('/api/photos/upload', {
         method: 'POST',
         body: formData
@@ -75,7 +75,7 @@ export function HomePage() {
         throw new Error(data.error ?? 'Upload failed');
       }
 
-      input.value = '';
+      setSuccessMessage(`${data.photos?.length ?? validFiles.length} photo(s) uploaded successfully.`);
       await loadPhotos();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
@@ -84,9 +84,20 @@ export function HomePage() {
     }
   }
 
+  async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const input = form.elements.namedItem('files') as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    await uploadFiles(input.files);
+    input.value = '';
+  }
+
   async function savePhoto() {
     if (!selectedPhoto) return;
     setError(null);
+    setSuccessMessage(null);
 
     const response = await fetch(`/api/photos/${selectedPhoto.id}`, {
       method: 'PATCH',
@@ -107,12 +118,14 @@ export function HomePage() {
       return;
     }
 
+    setSuccessMessage('Photo updated successfully.');
     await loadPhotos();
   }
 
   async function deletePhoto() {
     if (!selectedPhoto) return;
     setError(null);
+    setSuccessMessage(null);
 
     const response = await fetch(`/api/photos/${selectedPhoto.id}`, {
       method: 'DELETE'
@@ -125,12 +138,14 @@ export function HomePage() {
     }
 
     setSelectedPhoto(null);
+    setSuccessMessage('Photo deleted successfully.');
     await loadPhotos();
   }
 
   async function addTag() {
     if (!selectedPhoto || !tagName.trim()) return;
     setError(null);
+    setSuccessMessage(null);
 
     const response = await fetch(`/api/photos/${selectedPhoto.id}/tags`, {
       method: 'POST',
@@ -145,12 +160,14 @@ export function HomePage() {
     }
 
     setTagName('');
+    setSuccessMessage('Tag added successfully.');
     await loadPhotos();
   }
 
   async function removeTag(name: string) {
     if (!selectedPhoto) return;
     setError(null);
+    setSuccessMessage(null);
 
     const response = await fetch(`/api/photos/${selectedPhoto.id}/tags?tagName=${encodeURIComponent(name)}`, {
       method: 'DELETE'
@@ -162,6 +179,7 @@ export function HomePage() {
       return;
     }
 
+    setSuccessMessage('Tag removed successfully.');
     await loadPhotos();
   }
 
@@ -173,15 +191,44 @@ export function HomePage() {
       </div>
 
       {error && <div className="card error-banner">{error}</div>}
+      {successMessage && <div className="card success-banner">{successMessage}</div>}
 
       <div className="grid">
         <div className="stack">
           <section className="card stack">
             <h2>Upload photo</h2>
             <form onSubmit={handleUpload} className="stack">
-              <input name="file" type="file" accept="image/*" />
+              <div
+                className={`dropzone ${dragging ? 'dropzone-active' : ''}`}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  dragCounter.current += 1;
+                  setDragging(true);
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  dragCounter.current -= 1;
+                  if (dragCounter.current <= 0) {
+                    setDragging(false);
+                    dragCounter.current = 0;
+                  }
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  dragCounter.current = 0;
+                  setDragging(false);
+                  if (e.dataTransfer.files?.length) {
+                    await uploadFiles(e.dataTransfer.files);
+                  }
+                }}
+              >
+                <strong>Drag & drop photos here</strong>
+                <span className="small">or select one or more files below</span>
+              </div>
+              <input name="files" type="file" accept="image/*" multiple />
               <button type="submit" disabled={uploading}>
-                {uploading ? 'Uploading…' : 'Upload'}
+                {uploading ? 'Uploading…' : 'Upload selected photos'}
               </button>
             </form>
             <span className="small">Supported via browser upload. Provider sync will be added later.</span>
@@ -224,6 +271,7 @@ export function HomePage() {
             <section className="card stack">
               <h2>Edit photo</h2>
               <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
+              <div className="small">{selectedPhoto.originalFilename}</div>
               <label>
                 Caption
                 <textarea
@@ -327,7 +375,10 @@ export function HomePage() {
           </section>
 
           <section className="card stack">
-            <h2>Photos</h2>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0 }}>Photos</h2>
+              <span className="small">{photos.length} result(s)</span>
+            </div>
             <div className="photo-list">
               {photos.map((photo) => (
                 <article
