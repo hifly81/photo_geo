@@ -20,12 +20,38 @@ const emptyFilters = {
   tag: ''
 };
 
+const uploadBatchSize = 50;
+
 type PhotoListTab = 'all' | 'missing-geolocation' | 'by-location';
 
 type DirectoryFileInputProps = InputHTMLAttributes<HTMLInputElement>;
 
+type UploadApiPhoto = PhotoRecord;
+
+type UploadDuplicate = {
+  id: string;
+  originalFilename: string;
+  fileHash: string | null;
+  reason: 'path' | 'hash';
+};
+
+type UploadFailed = {
+  name: string;
+  error: string;
+};
+
 function DirectoryFileInput(props: DirectoryFileInputProps) {
   return <input {...props} {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} />;
+}
+
+function chunkFiles(files: File[], size: number) {
+  const chunks: File[][] = [];
+
+  for (let index = 0; index < files.length; index += size) {
+    chunks.push(files.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 export function HomePage() {
@@ -165,34 +191,54 @@ export function HomePage() {
       return;
     }
 
-    const validationError = validateFiles(validFiles);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     setUploading(true);
     try {
-      const formData = new FormData();
-      validFiles.forEach((file) => formData.append('files', file));
+      const batches = chunkFiles(validFiles, uploadBatchSize);
+      const createdPhotos: UploadApiPhoto[] = [];
+      const duplicates: UploadDuplicate[] = [];
+      const failed: UploadFailed[] = [];
 
-      const response = await fetch('/api/photos/upload', {
-        method: 'POST',
-        body: formData
-      });
+      for (const batch of batches) {
+        const validationError = validateFiles(batch);
+        if (validationError) {
+          failed.push({
+            name: batch.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type) || file.size > uploadConstraints.maxFileSizeBytes)?.name ?? 'batch',
+            error: validationError
+          });
+          continue;
+        }
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? 'Upload failed');
+        const formData = new FormData();
+        batch.forEach((file) => formData.append('files', file));
+
+        const response = await fetch('/api/photos/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.details ?? data.error ?? 'Upload failed');
+        }
+
+        createdPhotos.push(...((data.photos ?? []) as UploadApiPhoto[]));
+        duplicates.push(...((data.duplicates ?? []) as UploadDuplicate[]));
+        failed.push(...((data.failed ?? []) as UploadFailed[]));
       }
 
-      const uploadedCount = data.photos?.length ?? validFiles.length;
-      const duplicateCount = data.duplicates?.length ?? 0;
-      setSuccessMessage(
-        duplicateCount > 0
-          ? `${uploadedCount} photo(s) uploaded, ${duplicateCount} duplicate(s) skipped.`
-          : `${uploadedCount} photo(s) uploaded successfully.`
-      );
+      const summaryParts = [`${createdPhotos.length} photo(s) uploaded successfully`];
+
+      if (duplicates.length > 0) {
+        summaryParts.push(`${duplicates.length} duplicate(s) skipped`);
+      }
+
+      if (failed.length > 0) {
+        const failedPreview = failed.slice(0, 5).map((item) => `${item.name}: ${item.error}`).join(' · ');
+        summaryParts.push(`${failed.length} failed`);
+        setError(`Some uploads failed. ${failedPreview}${failed.length > 5 ? ' …' : ''}`);
+      }
+
+      setSuccessMessage(`${summaryParts.join(', ')}.`);
       await loadPhotos();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
@@ -424,6 +470,7 @@ export function HomePage() {
                 <strong>Drag & drop photos here</strong>
                 <span className="small">or select one or more files or an entire folder below</span>
                 <span className="small">Folder selection scans subfolders recursively when supported by the browser</span>
+                <span className="small">Large imports are uploaded in batches of {uploadBatchSize} files</span>
                 <span className="small">Accepted: JPEG, PNG, WEBP, GIF · max {Math.round(uploadConstraints.maxFileSizeBytes / (1024 * 1024))}MB each</span>
               </div>
               <DirectoryFileInput name="files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />

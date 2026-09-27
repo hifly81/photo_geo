@@ -7,6 +7,11 @@ import { requireCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
+type FailedUpload = {
+  name: string;
+  error: string;
+};
+
 async function parseFormData(request: NextRequest) {
   const formData = await request.formData();
   const files = formData.getAll('files');
@@ -19,11 +24,6 @@ async function parseFormData(request: NextRequest) {
 
   if (!imageFiles.length) {
     throw new Error('Only supported image uploads are allowed');
-  }
-
-  const oversized = imageFiles.find((file) => file.size > uploadConstraints.maxFileSizeBytes);
-  if (oversized) {
-    throw new Error(`File too large: ${oversized.name}`);
   }
 
   return imageFiles;
@@ -40,36 +40,47 @@ export async function POST(request: NextRequest) {
     const files = await parseFormData(request);
     const createdPhotos = [];
     const duplicates = [];
+    const failed: FailedUpload[] = [];
 
     for (const file of files) {
       const normalizedOriginalFilename = file.name.trim();
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const fileHash = calculateFileHash(buffer);
-      const existing = await prisma.photo.findFirst({
-        where: {
-          userId: user.id,
-          OR: [
-            { fileHash },
-            { originalFilename: normalizedOriginalFilename }
-          ]
-        }
-      });
 
-      if (existing) {
-        duplicates.push({
-          id: existing.id,
-          originalFilename: existing.originalFilename,
-          fileHash: existing.fileHash,
-          reason: existing.originalFilename === normalizedOriginalFilename ? 'path' : 'hash'
+      if (file.size > uploadConstraints.maxFileSizeBytes) {
+        failed.push({
+          name: normalizedOriginalFilename || 'unnamed-file',
+          error: `File too large. Max size is ${Math.round(uploadConstraints.maxFileSizeBytes / (1024 * 1024))}MB.`
         });
         continue;
       }
 
-      const tempPath = await writeBufferToTempFile(buffer, normalizedOriginalFilename);
+      let tempPath: string | null = null;
       let stored: Awaited<ReturnType<typeof saveUploadedFile>> | null = null;
 
       try {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const fileHash = calculateFileHash(buffer);
+        const existing = await prisma.photo.findFirst({
+          where: {
+            userId: user.id,
+            OR: [
+              { fileHash },
+              { originalFilename: normalizedOriginalFilename }
+            ]
+          }
+        });
+
+        if (existing) {
+          duplicates.push({
+            id: existing.id,
+            originalFilename: existing.originalFilename,
+            fileHash: existing.fileHash,
+            reason: existing.originalFilename === normalizedOriginalFilename ? 'path' : 'hash'
+          });
+          continue;
+        }
+
+        tempPath = await writeBufferToTempFile(buffer, normalizedOriginalFilename);
         stored = await saveUploadedFile(tempPath, normalizedOriginalFilename);
         const metadata = await extractPhotoMetadata(stored.absolutePath);
 
@@ -98,13 +109,19 @@ export async function POST(request: NextRequest) {
         if (stored) {
           await deleteStoredFileByRelativePath(stored.relativePath);
         }
-        throw error;
+
+        failed.push({
+          name: normalizedOriginalFilename || 'unnamed-file',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       } finally {
-        await cleanupTempFile(tempPath);
+        if (tempPath) {
+          await cleanupTempFile(tempPath);
+        }
       }
     }
 
-    return NextResponse.json({ photos: createdPhotos, duplicates }, { status: 201 });
+    return NextResponse.json({ photos: createdPhotos, duplicates, failed }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       {
