@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { saveUploadedFile, writeBufferToTempFile, cleanupTempFile, calculateFileHash, deleteStoredFileByRelativePath } from '@/lib/storage';
 import { extractPhotoMetadata } from '@/lib/exif';
 import { uploadConstraints } from '@/lib/validators';
+import { requireCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -29,6 +30,12 @@ async function parseFormData(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const files = await parseFormData(request);
     const createdPhotos = [];
@@ -38,7 +45,7 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const fileHash = calculateFileHash(buffer);
-      const existing = await prisma.photo.findUnique({ where: { fileHash } });
+      const existing = await prisma.photo.findFirst({ where: { userId: user.id, fileHash } });
 
       if (existing) {
         duplicates.push({ id: existing.id, originalFilename: existing.originalFilename, fileHash });
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
 
         const photo = await prisma.photo.create({
           data: {
+            userId: user.id,
             originalFilename: file.name,
             storagePath: stored.relativePath,
             source: 'upload',

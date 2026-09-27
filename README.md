@@ -4,9 +4,13 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 
 ## Features
 
+- Local username-based sign in / sign out
+- Cookie session handling via Next.js middleware + API helpers
+- Protected API routes for photo and tag operations
+- Per-user photo ownership
 - Upload one or more photos from local file system
 - Stronger upload validation by MIME type and size
-- Basic duplicate detection by SHA-256 hash
+- Basic duplicate detection by SHA-256 hash per user
 - Store files on the server in `uploads/`
 - Extract EXIF metadata when available
 - Save photo records with Prisma + SQLite
@@ -30,17 +34,16 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - EXIF parsing with `exifr`
 - Node test runner for API-focused tests
 
-## Project structure
+## Auth model
 
-- `src/app` – UI pages and API routes
-- `src/components` – React components
-- `src/lib` – database, validation, EXIF, storage helpers
-- `src/providers` – placeholder provider connectors for future Google Photos / Amazon Photos support
-- `src/types` – shared frontend types
-- `src/test` – API and utility tests
-- `prisma` – schema and local SQLite database
-- `scripts` – maintenance scripts such as hash backfill
-- `uploads` – local file storage for uploaded images
+This version uses a lightweight local auth flow for MVP development:
+
+- A user signs in with a username
+- The app creates the user if it does not exist yet
+- A cookie-based session stores the selected user id
+- Protected APIs require the session cookie
+
+This is intentionally simple and can later be replaced by NextAuth/Auth.js, Clerk, or a custom auth provider.
 
 ## Setup
 
@@ -90,15 +93,14 @@ npm test
 - `country` and `city` can be edited manually after upload.
 - Google Photos and Amazon Photos are not implemented yet. The `src/providers` folder contains placeholders for future connectors.
 - SQLite is used for simplicity. The data model is compatible with a future move to PostgreSQL.
-- There is a stub mobile app scaffold in `mobile/` to document the future Expo app direction.
-- There is a storage adapter abstraction ready for a future S3-backed implementation.
 - Duplicate detection is best-effort for the local MVP and uses file hashes.
+- Authentication is local/dev-oriented and not intended as production-grade security.
 
 ## Future work
 
+- Real auth provider integration
 - Real Expo / React Native mobile app implementation
 - Cloud storage adapter for S3
 - OAuth and sync flows for Google Photos / Amazon Photos
 - Reverse geocoding for automatic city/country suggestions
 - Marker clustering on the map
-- Multi-user auth

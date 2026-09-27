@@ -7,12 +7,21 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  photos    Photo[]
+}
+
 model Photo {
   id               String    @id @default(cuid())
+  userId           String
   originalFilename String
   storagePath      String
   source           String
-  fileHash         String?   @unique
+  fileHash         String?
   takenAt          DateTime?
   latitude         Float?
   longitude        Float?
@@ -21,7 +30,10 @@ model Photo {
   caption          String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags             PhotoTag[]
+
+  @@unique([userId, fileHash])
 }
 
 model Tag {

@@ -2,6 +2,14 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+async function ensureUser(username) {
+  return prisma.user.upsert({
+    where: { username },
+    update: {},
+    create: { username }
+  });
+}
+
 async function ensureTag(name) {
   return prisma.tag.upsert({
     where: { name },
@@ -10,9 +18,10 @@ async function ensureTag(name) {
   });
 }
 
-async function ensureDemoPhoto() {
+async function ensureDemoPhoto(userId) {
   const existing = await prisma.photo.findFirst({
     where: {
+      userId,
       originalFilename: 'demo-rome.jpg',
       source: 'seed'
     }
@@ -24,6 +33,7 @@ async function ensureDemoPhoto() {
 
   return prisma.photo.create({
     data: {
+      userId,
       originalFilename: 'demo-rome.jpg',
       storagePath: '/api/files/demo-rome.jpg',
       source: 'seed',
@@ -55,9 +65,10 @@ async function ensurePhotoTag(photoId, tagId) {
 }
 
 async function main() {
+  const demoUser = await ensureUser('demo');
   const panorama = await ensureTag('panorama');
   const city = await ensureTag('city');
-  const photo = await ensureDemoPhoto();
+  const photo = await ensureDemoPhoto(demoUser.id);
 
   await ensurePhotoTag(photo.id, panorama.id);
   await ensurePhotoTag(photo.id, city.id);

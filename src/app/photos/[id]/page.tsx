@@ -1,10 +1,17 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { getPhoto } from '@/lib/photos';
+import { notFound, redirect } from 'next/navigation';
+import { getPhotoForUser } from '@/lib/photos';
+import { getCurrentUser } from '@/lib/auth';
 
 export default async function PhotoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
   const { id } = await params;
-  const photo = await getPhoto(id);
+  const photo = await getPhotoForUser(id, user.id);
 
   if (!photo) {
     notFound();

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
-export async function listPhotos(filters: {
+export async function listPhotos(userId: string, filters: {
   from?: string;
   to?: string;
   country?: string;
@@ -9,6 +9,7 @@ export async function listPhotos(filters: {
 }) {
   return prisma.photo.findMany({
     where: {
+      userId,
       takenAt: filters.from || filters.to ? {
         gte: filters.from ? new Date(filters.from) : undefined,
         lte: filters.to ? new Date(filters.to) : undefined
@@ -36,9 +37,9 @@ export async function listPhotos(filters: {
   });
 }
 
-export async function getPhoto(id: string) {
-  return prisma.photo.findUnique({
-    where: { id },
+export async function getPhotoForUser(id: string, userId: string) {
+  return prisma.photo.findFirst({
+    where: { id, userId },
     include: {
       tags: {
         include: {
