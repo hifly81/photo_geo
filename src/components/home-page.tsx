@@ -2,20 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-
-type Photo = {
-  id: string;
-  originalFilename: string;
-  storagePath: string;
-  source: string;
-  takenAt: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  country: string | null;
-  city: string | null;
-  caption: string | null;
-  tags: Array<{ tag: { id: string; name: string } }>;
-};
+import type { PhotoRecord } from '@/types/photo';
 
 const PhotoMap = dynamic(() => import('@/components/photo-map').then((mod) => mod.PhotoMap), {
   ssr: false
@@ -30,11 +17,12 @@ const emptyFilters = {
 };
 
 export function HomePage() {
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [photos, setPhotos] = useState<PhotoRecord[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [uploading, setUploading] = useState(false);
   const [tagName, setTagName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -47,9 +35,9 @@ export function HomePage() {
   async function loadPhotos() {
     const response = await fetch(`/api/photos${query ? `?${query}` : ''}`);
     const data = await response.json();
-    setPhotos(data.photos);
+    setPhotos(data.photos ?? []);
     if (selectedPhoto) {
-      const refreshed = data.photos.find((photo: Photo) => photo.id === selectedPhoto.id) ?? null;
+      const refreshed = (data.photos ?? []).find((photo: PhotoRecord) => photo.id === selectedPhoto.id) ?? null;
       setSelectedPhoto(refreshed);
     }
   }
@@ -61,12 +49,19 @@ export function HomePage() {
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
     const form = event.currentTarget;
     const input = form.elements.namedItem('file') as HTMLInputElement;
     if (!input.files?.[0]) return;
 
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file.');
+      return;
+    }
+
     const formData = new FormData();
-    formData.append('file', input.files[0]);
+    formData.append('file', file);
 
     setUploading(true);
     try {
@@ -75,12 +70,15 @@ export function HomePage() {
         body: formData
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error(data.error ?? 'Upload failed');
       }
 
       input.value = '';
       await loadPhotos();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -88,8 +86,9 @@ export function HomePage() {
 
   async function savePhoto() {
     if (!selectedPhoto) return;
+    setError(null);
 
-    await fetch(`/api/photos/${selectedPhoto.id}`, {
+    const response = await fetch(`/api/photos/${selectedPhoto.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -102,17 +101,48 @@ export function HomePage() {
       })
     });
 
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.error ?? 'Save failed');
+      return;
+    }
+
+    await loadPhotos();
+  }
+
+  async function deletePhoto() {
+    if (!selectedPhoto) return;
+    setError(null);
+
+    const response = await fetch(`/api/photos/${selectedPhoto.id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.error ?? 'Delete failed');
+      return;
+    }
+
+    setSelectedPhoto(null);
     await loadPhotos();
   }
 
   async function addTag() {
     if (!selectedPhoto || !tagName.trim()) return;
+    setError(null);
 
-    await fetch(`/api/photos/${selectedPhoto.id}/tags`, {
+    const response = await fetch(`/api/photos/${selectedPhoto.id}/tags`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tagName })
     });
+
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.error ?? 'Could not add tag');
+      return;
+    }
 
     setTagName('');
     await loadPhotos();
@@ -120,10 +150,17 @@ export function HomePage() {
 
   async function removeTag(name: string) {
     if (!selectedPhoto) return;
+    setError(null);
 
-    await fetch(`/api/photos/${selectedPhoto.id}/tags?tagName=${encodeURIComponent(name)}`, {
+    const response = await fetch(`/api/photos/${selectedPhoto.id}/tags?tagName=${encodeURIComponent(name)}`, {
       method: 'DELETE'
     });
+
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.error ?? 'Could not remove tag');
+      return;
+    }
 
     await loadPhotos();
   }
@@ -135,6 +172,8 @@ export function HomePage() {
         <p>Upload photos, place them on a map, edit metadata, and search by place or time.</p>
       </div>
 
+      {error && <div className="card error-banner">{error}</div>}
+
       <div className="grid">
         <div className="stack">
           <section className="card stack">
@@ -145,6 +184,7 @@ export function HomePage() {
                 {uploading ? 'Uploading…' : 'Upload'}
               </button>
             </form>
+            <span className="small">Supported via browser upload. Provider sync will be added later.</span>
           </section>
 
           <section className="card stack">
@@ -153,7 +193,6 @@ export function HomePage() {
               From
               <input
                 type="datetime-local"
-                value={filters.from}
                 onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
               />
             </label>
@@ -161,7 +200,6 @@ export function HomePage() {
               To
               <input
                 type="datetime-local"
-                value={filters.to}
                 onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
               />
             </label>
@@ -236,6 +274,7 @@ export function HomePage() {
                   />
                 </label>
               </div>
+              <span className="small">Tip: click on the map while this photo is selected to set its position.</span>
               <div className="row">
                 <label>
                   Country
@@ -252,7 +291,10 @@ export function HomePage() {
                   />
                 </label>
               </div>
-              <button type="button" onClick={savePhoto}>Save changes</button>
+              <div className="row">
+                <button type="button" onClick={savePhoto}>Save changes</button>
+                <button type="button" className="danger" onClick={deletePhoto}>Delete photo</button>
+              </div>
 
               <div className="stack">
                 <h3>Tags</h3>
@@ -260,7 +302,7 @@ export function HomePage() {
                   {selectedPhoto.tags.map(({ tag }) => (
                     <span key={tag.id} className="tag">
                       {tag.name}
-                      <button type="button" className="danger" onClick={() => removeTag(tag.name)}>x</button>
+                      <button type="button" className="danger small-button" onClick={() => removeTag(tag.name)}>x</button>
                     </span>
                   ))}
                 </div>
@@ -277,7 +319,10 @@ export function HomePage() {
           <section className="card stack">
             <h2>Map</h2>
             <div className="map-wrap">
-              <PhotoMap photos={photos} onSelectPhoto={setSelectedPhoto} />
+              <PhotoMap photos={photos} selectedPhoto={selectedPhoto} onSelectPhoto={setSelectedPhoto} onPickLocation={(lat, lng) => {
+                if (!selectedPhoto) return;
+                setSelectedPhoto({ ...selectedPhoto, latitude: lat, longitude: lng });
+              }} />
             </div>
           </section>
 
@@ -289,7 +334,7 @@ export function HomePage() {
                   key={photo.id}
                   className="photo-card card"
                   onClick={() => setSelectedPhoto(photo)}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', border: selectedPhoto?.id === photo.id ? '2px solid #0f62fe' : undefined }}
                 >
                   <img src={photo.storagePath} alt={photo.originalFilename} />
                   <div className="stack">

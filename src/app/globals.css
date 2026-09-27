@@ -66,6 +66,7 @@ label {
   flex-direction: column;
   gap: 6px;
   font-size: 14px;
+  flex: 1;
 }
 
 input,
@@ -93,6 +94,10 @@ button.secondary {
 
 button.danger {
   background: #c62828;
+}
+
+.small-button {
+  padding: 2px 8px;
 }
 
 .photo-list {
@@ -135,6 +140,11 @@ button.danger {
 .small {
   font-size: 12px;
   color: #666;
+}
+
+.error-banner {
+  border-left: 4px solid #c62828;
+  color: #7f1d1d;
 }
 
 @media (max-width: 960px) {

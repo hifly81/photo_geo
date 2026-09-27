@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveStoredFilePath } from '@/lib/storage';
+import { imageContentTypeFromPath } from '@/lib/photos';
 import fs from 'node:fs/promises';
 
 export const runtime = 'nodejs';
@@ -12,7 +13,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ filename:
     const file = await fs.readFile(path);
     return new NextResponse(file, {
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': imageContentTypeFromPath(path),
         'Cache-Control': 'public, max-age=31536000, immutable'
       }
     });

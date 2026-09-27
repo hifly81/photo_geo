@@ -10,11 +10,11 @@ export const photoFiltersSchema = z.object({
 
 export const updatePhotoSchema = z.object({
   takenAt: z.string().datetime().nullable().optional(),
-  latitude: z.number().nullable().optional(),
-  longitude: z.number().nullable().optional(),
-  country: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  caption: z.string().nullable().optional()
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  country: z.string().max(100).nullable().optional(),
+  city: z.string().max(100).nullable().optional(),
+  caption: z.string().max(500).nullable().optional()
 });
 
 export const tagSchema = z.object({

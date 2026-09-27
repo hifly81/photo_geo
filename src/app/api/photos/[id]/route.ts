@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getPhoto } from '@/lib/photos';
 import { updatePhotoSchema } from '@/lib/validators';
+import { deleteStoredFileByRelativePath } from '@/lib/storage';
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -50,4 +51,18 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   });
 
   return NextResponse.json({ photo });
+}
+
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const existing = await prisma.photo.findUnique({ where: { id } });
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+  }
+
+  await prisma.photo.delete({ where: { id } });
+  await deleteStoredFileByRelativePath(existing.storagePath);
+
+  return NextResponse.json({ ok: true });
 }

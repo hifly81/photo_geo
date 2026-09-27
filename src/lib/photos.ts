@@ -48,3 +48,12 @@ export async function getPhoto(id: string) {
     }
   });
 }
+
+export function imageContentTypeFromPath(storagePath: string) {
+  const normalized = storagePath.toLowerCase();
+  if (normalized.endsWith('.png')) return 'image/png';
+  if (normalized.endsWith('.webp')) return 'image/webp';
+  if (normalized.endsWith('.gif')) return 'image/gif';
+  if (normalized.endsWith('.jpeg') || normalized.endsWith('.jpg')) return 'image/jpeg';
+  return 'application/octet-stream';
+}
