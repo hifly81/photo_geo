@@ -24,6 +24,8 @@ type PhotoListTab = 'all' | 'missing-geolocation';
 export function HomePage() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [lastSelectedPhotoId, setLastSelectedPhotoId] = useState<string | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [uploading, setUploading] = useState(false);
   const [tagName, setTagName] = useState('');
@@ -47,15 +49,22 @@ export function HomePage() {
   );
 
   const visiblePhotos = photoListTab === 'missing-geolocation' ? photosWithoutGeolocation : photos;
+  const selectedPhotosCount = selectedPhotoIds.length;
+  const isMultiSelection = selectedPhotosCount > 1;
 
   async function loadPhotos() {
     const response = await fetch(`/api/photos${query ? `?${query}` : ''}`);
     const data = await response.json();
-    setPhotos(data.photos ?? []);
+    const nextPhotos = data.photos ?? [];
+    setPhotos(nextPhotos);
+
     if (selectedPhoto) {
-      const refreshed = (data.photos ?? []).find((photo: PhotoRecord) => photo.id === selectedPhoto.id) ?? null;
+      const refreshed = nextPhotos.find((photo: PhotoRecord) => photo.id === selectedPhoto.id) ?? null;
       setSelectedPhoto(refreshed);
     }
+
+    setSelectedPhotoIds((current) => current.filter((id) => nextPhotos.some((photo: PhotoRecord) => photo.id === id)));
+    setLastSelectedPhotoId((current) => (current && nextPhotos.some((photo: PhotoRecord) => photo.id === current) ? current : null));
   }
 
   useEffect(() => {
@@ -170,6 +179,42 @@ export function HomePage() {
     await loadPhotos();
   }
 
+  async function saveSelectedPhotosLocation(location: {
+    city: string | null;
+    country: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  }) {
+    if (selectedPhotoIds.length === 0) return;
+
+    setError(null);
+    setSuccessMessage(null);
+
+    const updates = await Promise.all(
+      selectedPhotoIds.map((photoId) =>
+        fetch(`/api/photos/${photoId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(location)
+        })
+      )
+    );
+
+    const failed = updates.find((response) => !response.ok);
+    if (failed) {
+      const data = await failed.json();
+      setError(data.error ?? 'Batch update failed');
+      return;
+    }
+
+    setSuccessMessage(
+      selectedPhotoIds.length > 1
+        ? `Location applied to ${selectedPhotoIds.length} photos.`
+        : 'Location applied to the selected photo.'
+    );
+    await loadPhotos();
+  }
+
   async function deletePhoto() {
     if (!selectedPhoto) return;
     setError(null);
@@ -186,6 +231,7 @@ export function HomePage() {
     }
 
     setSelectedPhoto(null);
+    setSelectedPhotoIds((current) => current.filter((id) => id !== selectedPhoto.id));
     setSuccessMessage('Photo deleted successfully.');
     await loadPhotos();
   }
@@ -233,13 +279,42 @@ export function HomePage() {
 
   function applyLocation(result: GeocodeResult) {
     if (!selectedPhoto) return;
-    setSelectedPhoto({
-      ...selectedPhoto,
+
+    const location = {
       city: result.city || selectedPhoto.city,
       country: result.country || selectedPhoto.country,
       latitude: result.latitude,
       longitude: result.longitude
+    };
+
+    setSelectedPhoto({
+      ...selectedPhoto,
+      ...location
     });
+
+    if (selectedPhotoIds.length > 1) {
+      void saveSelectedPhotosLocation(location);
+    }
+  }
+
+  function handlePhotoSelection(photo: PhotoRecord, event: React.MouseEvent<HTMLElement>) {
+    if (event.shiftKey && lastSelectedPhotoId) {
+      const lastIndex = visiblePhotos.findIndex((item) => item.id === lastSelectedPhotoId);
+      const currentIndex = visiblePhotos.findIndex((item) => item.id === photo.id);
+
+      if (lastIndex >= 0 && currentIndex >= 0) {
+        const [start, end] = lastIndex < currentIndex ? [lastIndex, currentIndex] : [currentIndex, lastIndex];
+        const rangeIds = visiblePhotos.slice(start, end + 1).map((item) => item.id);
+        setSelectedPhotoIds(rangeIds);
+      } else {
+        setSelectedPhotoIds([photo.id]);
+      }
+    } else {
+      setSelectedPhotoIds([photo.id]);
+    }
+
+    setSelectedPhoto(photo);
+    setLastSelectedPhotoId(photo.id);
   }
 
   return (
@@ -330,16 +405,18 @@ export function HomePage() {
           {selectedPhoto && (
             <section className="card stack">
               <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ margin: 0 }}>Edit photo</h2>
+                <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                 <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
               </div>
               <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
               <div className="small">{selectedPhoto.originalFilename}</div>
+              {isMultiSelection && <div className="small">Shift + click selection active. Geo/city/country changes apply to all selected photos.</div>}
               <label>
                 Caption
                 <textarea
                   value={selectedPhoto.caption ?? ''}
                   onChange={(e) => setSelectedPhoto({ ...selectedPhoto, caption: e.target.value })}
+                  disabled={isMultiSelection}
                 />
               </label>
               <label>
@@ -353,6 +430,7 @@ export function HomePage() {
                       takenAt: e.target.value ? new Date(e.target.value).toISOString() : null
                     })
                   }
+                  disabled={isMultiSelection}
                 />
               </label>
               <div className="row">
@@ -410,8 +488,25 @@ export function HomePage() {
                 />
               </div>
               <div className="row">
-                <button type="button" onClick={savePhoto}>Save changes</button>
-                <button type="button" className="danger" onClick={deletePhoto}>Delete photo</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isMultiSelection) {
+                      void saveSelectedPhotosLocation({
+                        city: selectedPhoto.city ?? null,
+                        country: selectedPhoto.country ?? null,
+                        latitude: selectedPhoto.latitude ?? null,
+                        longitude: selectedPhoto.longitude ?? null
+                      });
+                      return;
+                    }
+
+                    void savePhoto();
+                  }}
+                >
+                  {isMultiSelection ? `Apply location to ${selectedPhotosCount} photos` : 'Save changes'}
+                </button>
+                <button type="button" className="danger" onClick={deletePhoto} disabled={isMultiSelection}>Delete photo</button>
               </div>
 
               <div className="stack">
@@ -426,7 +521,7 @@ export function HomePage() {
                 </div>
                 <div className="row">
                   <input value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="e.g. panorama" />
-                  <button type="button" onClick={addTag}>Add tag</button>
+                  <button type="button" onClick={addTag} disabled={isMultiSelection}>Add tag</button>
                 </div>
               </div>
             </section>
@@ -439,7 +534,17 @@ export function HomePage() {
             <div className="map-wrap">
               <PhotoMap photos={visiblePhotos} selectedPhoto={selectedPhoto} onSelectPhoto={setSelectedPhoto} onPickLocation={(lat, lng) => {
                 if (!selectedPhoto) return;
-                setSelectedPhoto({ ...selectedPhoto, latitude: lat, longitude: lng });
+                const nextPhoto = { ...selectedPhoto, latitude: lat, longitude: lng };
+                setSelectedPhoto(nextPhoto);
+
+                if (selectedPhotoIds.length > 1) {
+                  void saveSelectedPhotosLocation({
+                    city: nextPhoto.city ?? null,
+                    country: nextPhoto.country ?? null,
+                    latitude: lat,
+                    longitude: lng
+                  });
+                }
               }} />
             </div>
           </section>
@@ -465,28 +570,32 @@ export function HomePage() {
                 Without geolocation ({photosWithoutGeolocation.length})
               </button>
             </div>
+            <div className="small">Click to select one photo. Use Shift + click to select a range and apply the same geo/city/country.</div>
             <div className="photo-list">
-              {visiblePhotos.map((photo) => (
-                <article
-                  key={photo.id}
-                  className="photo-card card"
-                  onClick={() => setSelectedPhoto(photo)}
-                  style={{ cursor: 'pointer', border: selectedPhoto?.id === photo.id ? '2px solid #0f62fe' : undefined }}
-                >
-                  <img src={photo.storagePath} alt={photo.originalFilename} />
-                  <div className="stack">
-                    <strong>{photo.originalFilename}</strong>
-                    <span className="small">{photo.takenAt ? new Date(photo.takenAt).toLocaleString() : 'No date'}</span>
-                    <span className="small">{photo.country || photo.city ? `${photo.city ?? ''} ${photo.country ?? ''}`.trim() : 'No location label'}</span>
-                    <div className="tag-list">
-                      {photo.tags.map(({ tag }) => (
-                        <span key={tag.id} className="tag">{tag.name}</span>
-                      ))}
+              {visiblePhotos.map((photo) => {
+                const isSelected = selectedPhotoIds.includes(photo.id);
+                return (
+                  <article
+                    key={photo.id}
+                    className="photo-card card"
+                    onClick={(event) => handlePhotoSelection(photo, event)}
+                    style={{ cursor: 'pointer', border: isSelected ? '2px solid #0f62fe' : undefined }}
+                  >
+                    <img src={photo.storagePath} alt={photo.originalFilename} />
+                    <div className="stack">
+                      <strong>{photo.originalFilename}</strong>
+                      <span className="small">{photo.takenAt ? new Date(photo.takenAt).toLocaleString() : 'No date'}</span>
+                      <span className="small">{photo.country || photo.city ? `${photo.city ?? ''} ${photo.country ?? ''}`.trim() : 'No location label'}</span>
+                      <div className="tag-list">
+                        {photo.tags.map(({ tag }) => (
+                          <span key={tag.id} className="tag">{tag.name}</span>
+                        ))}
+                      </div>
+                      <Link href={`/photos/${photo.id}`}>View details</Link>
                     </div>
-                    <Link href={`/photos/${photo.id}`}>View details</Link>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </div>

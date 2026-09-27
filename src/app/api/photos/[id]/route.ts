@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getPhoto, removeOrphanTags } from '@/lib/photos';
-import { updatePhotoSchema } from '@/lib/validators';
+import { updatePhotoSchema, bulkUpdatePhotosSchema } from '@/lib/validators';
 import { deleteStoredFileByRelativePath } from '@/lib/storage';
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -70,4 +70,29 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
   await removeOrphanTags();
 
   return NextResponse.json({ ok: true });
+}
+
+export async function PUT(request: NextRequest) {
+  const body = await request.json();
+  const parseResult = bulkUpdatePhotosSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return NextResponse.json({ error: 'Invalid payload', details: parseResult.error.flatten() }, { status: 400 });
+  }
+
+  const { ids, city, country, latitude, longitude } = parseResult.data;
+
+  const result = await prisma.photo.updateMany({
+    where: {
+      id: { in: ids }
+    },
+    data: {
+      city,
+      country,
+      latitude,
+      longitude
+    }
+  });
+
+  return NextResponse.json({ updated: result.count });
 }

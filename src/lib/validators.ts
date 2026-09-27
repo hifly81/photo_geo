@@ -17,6 +17,14 @@ export const updatePhotoSchema = z.object({
   caption: z.string().max(500).nullable().optional()
 });
 
+export const bulkUpdatePhotosSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
+  country: z.string().max(100).nullable(),
+  city: z.string().max(100).nullable()
+});
+
 export const tagSchema = z.object({
   name: z.string().trim().min(1).max(50)
 });
