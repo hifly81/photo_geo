@@ -37,6 +37,7 @@ async function ensureDemoPhoto(userId) {
       originalFilename: 'demo-rome.jpg',
       storagePath: '/api/files/demo-rome.jpg',
       source: 'seed',
+      sourceItemId: 'seed-demo-rome',
       fileHash: 'seed-demo-rome-hash',
       takenAt: new Date('2024-06-15T10:00:00.000Z'),
       latitude: 41.9028,

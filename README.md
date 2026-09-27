@@ -8,6 +8,8 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Cookie session handling via Next.js middleware + API helpers
 - Protected API routes for photo and tag operations
 - Per-user photo ownership
+- Google Photos OAuth connect / disconnect
+- Google Photos media listing and manual import into Photo Geo
 - Upload one or more photos from local file system
 - Stronger upload validation by MIME type and size
 - Basic duplicate detection by SHA-256 hash per user
@@ -21,9 +23,7 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Click on the map to set or update a photo position
 - Dedicated photo detail page
 - View geolocated photos on a Leaflet map
-- Placeholder import provider layer for Google Photos / Amazon Photos
 - Basic API and utility tests for core routes/helpers
-- Backfill script for legacy `fileHash` values
 
 ## Tech stack
 
@@ -43,7 +43,22 @@ This version uses a lightweight local auth flow for MVP development:
 - A cookie-based session stores the selected user id
 - Protected APIs require the session cookie
 
-This is intentionally simple and can later be replaced by NextAuth/Auth.js, Clerk, or a custom auth provider.
+## Google Photos setup
+
+Create a Google Cloud OAuth client and set these environment variables in `.env.local`:
+
+```bash
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/providers/google/callback
+```
+
+Required OAuth scopes:
+
+- `openid`
+- `email`
+- `profile`
+- `https://www.googleapis.com/auth/photoslibrary.readonly`
 
 ## Setup
 
@@ -60,47 +75,39 @@ npx prisma generate
 npx prisma db push
 ```
 
-3. Optional: backfill missing hashes for existing photos
-
-```bash
-npm run backfill:filehash
-```
-
-4. Optional: load demo data
+3. Optional: load demo data
 
 ```bash
 npm run seed
 ```
 
-5. Start the app:
+4. Start the app:
 
 ```bash
 npm run dev
 ```
 
-6. Run tests:
+5. Run tests:
 
 ```bash
 npm test
 ```
 
-7. Open the app at `http://localhost:3000`
+6. Open the app at `http://localhost:3000`
 
 ## Notes
 
 - The MVP stores uploaded files locally in `uploads/`.
+- Google Photos import is manual in this version: list media, then import selected items.
 - Reverse geocoding is not implemented to avoid requiring third-party API keys.
-- `country` and `city` can be edited manually after upload.
-- Google Photos and Amazon Photos are not implemented yet. The `src/providers` folder contains placeholders for future connectors.
 - SQLite is used for simplicity. The data model is compatible with a future move to PostgreSQL.
-- Duplicate detection is best-effort for the local MVP and uses file hashes.
 - Authentication is local/dev-oriented and not intended as production-grade security.
 
 ## Future work
 
+- Automatic incremental sync from Google Photos
+- Amazon Photos integration
 - Real auth provider integration
-- Real Expo / React Native mobile app implementation
 - Cloud storage adapter for S3
-- OAuth and sync flows for Google Photos / Amazon Photos
 - Reverse geocoding for automatic city/country suggestions
 - Marker clustering on the map

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { HomePage } from '@/components/home-page';
 import { LogoutButton } from '@/components/logout-button';
+import { GooglePhotosPanel } from '@/components/google-photos-panel';
 import { getCurrentUser } from '@/lib/auth';
 
 export default async function Page() {
@@ -25,6 +26,9 @@ export default async function Page() {
           </div>
         </nav>
       </header>
+      <main className="container stack">
+        <GooglePhotosPanel />
+      </main>
       <HomePage />
     </>
   );
