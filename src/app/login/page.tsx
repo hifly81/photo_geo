@@ -1,14 +1,11 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/login-form';
-
-const sessionCookieName = 'photo_geo_session';
+import { getCurrentUser } from '@/lib/auth';
 
 export default async function LoginPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get(sessionCookieName)?.value;
+  const user = await getCurrentUser();
 
-  if (userId) {
+  if (user) {
     redirect('/');
   }
 
