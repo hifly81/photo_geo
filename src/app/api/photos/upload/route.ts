@@ -42,27 +42,41 @@ export async function POST(request: NextRequest) {
     const duplicates = [];
 
     for (const file of files) {
+      const normalizedOriginalFilename = file.name.trim();
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const fileHash = calculateFileHash(buffer);
-      const existing = await prisma.photo.findFirst({ where: { userId: user.id, fileHash } });
+      const existing = await prisma.photo.findFirst({
+        where: {
+          userId: user.id,
+          OR: [
+            { fileHash },
+            { originalFilename: normalizedOriginalFilename }
+          ]
+        }
+      });
 
       if (existing) {
-        duplicates.push({ id: existing.id, originalFilename: existing.originalFilename, fileHash });
+        duplicates.push({
+          id: existing.id,
+          originalFilename: existing.originalFilename,
+          fileHash: existing.fileHash,
+          reason: existing.originalFilename === normalizedOriginalFilename ? 'path' : 'hash'
+        });
         continue;
       }
 
-      const tempPath = await writeBufferToTempFile(buffer, file.name);
+      const tempPath = await writeBufferToTempFile(buffer, normalizedOriginalFilename);
       let stored: Awaited<ReturnType<typeof saveUploadedFile>> | null = null;
 
       try {
-        stored = await saveUploadedFile(tempPath, file.name);
+        stored = await saveUploadedFile(tempPath, normalizedOriginalFilename);
         const metadata = await extractPhotoMetadata(stored.absolutePath);
 
         const photo = await prisma.photo.create({
           data: {
             userId: user.id,
-            originalFilename: file.name,
+            originalFilename: normalizedOriginalFilename,
             storagePath: stored.relativePath,
             source: 'upload',
             fileHash,
