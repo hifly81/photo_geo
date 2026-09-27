@@ -1,7 +1,14 @@
+'use client';
+
+import { useState } from 'react';
 import { GooglePhotosPanel } from '@/components/google-photos-panel';
 import { AmazonPhotosPanel } from '@/components/amazon-photos-panel';
 
+type IntegrationTab = 'google' | 'amazon';
+
 export function IntegrationsPanel() {
+  const [tab, setTab] = useState<IntegrationTab>('google');
+
   return (
     <section className="card stack">
       <div>
@@ -11,10 +18,24 @@ export function IntegrationsPanel() {
         </p>
       </div>
 
-      <div className="stack">
-        <GooglePhotosPanel />
-        <AmazonPhotosPanel />
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={tab === 'google' ? '' : 'secondary'}
+          onClick={() => setTab('google')}
+        >
+          Google Photos
+        </button>
+        <button
+          type="button"
+          className={tab === 'amazon' ? '' : 'secondary'}
+          onClick={() => setTab('amazon')}
+        >
+          Amazon Photos
+        </button>
       </div>
+
+      {tab === 'google' ? <GooglePhotosPanel /> : <AmazonPhotosPanel />}
     </section>
   );
 }

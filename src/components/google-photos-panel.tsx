@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ProviderIntegrationCard } from '@/components/provider-integration-card';
 
 type GoogleMediaItem = {
   id: string;
@@ -82,65 +83,40 @@ export function GooglePhotosPanel() {
     setSelectedIds([]);
   }
 
-  if (loading) {
-    return <div className="stack"><strong>Google Photos</strong><p className="small">Loading…</p></div>;
-  }
-
   return (
-    <div className="stack" style={{ paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h3 style={{ marginBottom: 4 }}>Google Photos</h3>
-          <p className="small">Connect your Google account and manually import selected items.</p>
-        </div>
-        <div className="row">
-          {!connected ? (
-            <a className="button" href="/api/providers/google/connect">Connect Google Photos</a>
-          ) : (
-            <>
-              <button type="button" className="secondary" onClick={loadMedia}>Refresh</button>
-              <button type="button" className="secondary" onClick={disconnect}>Disconnect</button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {message && <div className="card error-banner">{message}</div>}
-
-      {connected ? (
-        <>
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong>{items.length} item(s) available</strong>
-            <button type="button" onClick={importSelected} disabled={importing || selectedIds.length === 0}>
-              {importing ? 'Importing…' : `Import selected (${selectedIds.length})`}
-            </button>
-          </div>
-          <div className="photo-grid">
-            {items.map((item) => {
-              const selected = selectedIds.includes(item.id);
-              return (
-                <label key={item.id} className="card stack" style={{ cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => toggleSelection(item.id)}
-                  />
-                  {item.baseUrl ? (
-                    <img
-                      src={`${item.baseUrl}=w400-h300`}
-                      alt={item.filename ?? item.id}
-                      style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 12, background: '#f3f4f6' }}
-                    />
-                  ) : null}
-                  <div className="small">{item.filename ?? item.id}</div>
-                </label>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <p className="small">Google Photos is not connected yet.</p>
+    <ProviderIntegrationCard
+      title="Google Photos"
+      description="Connect your Google account and manually import selected items."
+      connected={connected}
+      loading={loading}
+      message={message}
+      items={items}
+      selectedIds={selectedIds}
+      importing={importing}
+      connectHref="/api/providers/google/connect"
+      emptyText="Google Photos is not connected yet."
+      onRefresh={loadMedia}
+      onDisconnect={disconnect}
+      onImportSelected={importSelected}
+      onToggleSelection={toggleSelection}
+      getItemId={(item) => item.id}
+      renderItem={(item, selected) => (
+        <label key={item.id} className="card stack" style={{ cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => toggleSelection(item.id)}
+          />
+          {item.baseUrl ? (
+            <img
+              src={`${item.baseUrl}=w400-h300`}
+              alt={item.filename ?? item.id}
+              style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 12, background: '#f3f4f6' }}
+            />
+          ) : null}
+          <div className="small">{item.filename ?? item.id}</div>
+        </label>
       )}
-    </div>
+    />
   );
 }
