@@ -22,7 +22,7 @@ const emptyFilters = {
 
 const uploadBatchSize = 50;
 
-type PhotoListTab = 'all' | 'with-geolocation' | 'missing-geolocation' | 'by-location';
+type PhotoListTab = 'all' | 'with-geolocation' | 'missing-geolocation' | 'missing-location-info' | 'by-location';
 
 type DirectoryFileInputProps = InputHTMLAttributes<HTMLInputElement>;
 
@@ -89,6 +89,19 @@ export function HomePage() {
     [photos]
   );
 
+  const photosMissingLocationInfo = useMemo(
+    () =>
+      photos.filter(
+        (photo) =>
+          photo.latitude != null &&
+          photo.longitude != null &&
+          !photo.country?.trim() &&
+          !photo.city?.trim() &&
+          !photo.placeName?.trim()
+      ),
+    [photos]
+  );
+
   const availableCountries = useMemo(
     () => Array.from(new Set(photos.map((photo) => photo.country?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b)),
     [photos]
@@ -113,6 +126,10 @@ export function HomePage() {
   }, [locationCity, locationCountry, photos]);
 
   const visiblePhotos = useMemo(() => {
+    if (photoListTab === 'missing-location-info') {
+      return photosMissingLocationInfo;
+    }
+
     if (photoListTab === 'with-geolocation') {
       return photosWithGeolocation;
     }
@@ -126,7 +143,7 @@ export function HomePage() {
     }
 
     return photos;
-  }, [locationFilteredPhotos, photoListTab, photos, photosWithGeolocation, photosWithoutGeolocation]);
+  }, [locationFilteredPhotos, photoListTab, photos, photosMissingLocationInfo, photosWithGeolocation, photosWithoutGeolocation]);
 
   const selectedPhotosCount = selectedPhotoIds.length;
   const isMultiSelection = selectedPhotosCount > 1;
@@ -711,6 +728,13 @@ export function HomePage() {
                 onClick={() => setPhotoListTab('missing-geolocation')}
               >
                 Without geolocation ({photosWithoutGeolocation.length})
+              </button>
+              <button
+                type="button"
+                className={photoListTab === 'missing-location-info' ? '' : 'secondary'}
+                onClick={() => setPhotoListTab('missing-location-info')}
+              >
+                Missing location info ({photosMissingLocationInfo.length})
               </button>
               <button
                 type="button"
