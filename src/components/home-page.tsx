@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { PhotoRecord } from '@/types/photo';
 import { uploadConstraints } from '@/lib/validators';
+import { LocationAutocomplete, type GeocodeResult } from '@/components/location-autocomplete';
 
 const PhotoMap = dynamic(() => import('@/components/photo-map').then((mod) => mod.PhotoMap), {
   ssr: false
@@ -211,6 +212,17 @@ export function HomePage() {
     await loadPhotos();
   }
 
+  function applyLocation(result: GeocodeResult) {
+    if (!selectedPhoto) return;
+    setSelectedPhoto({
+      ...selectedPhoto,
+      city: result.city || selectedPhoto.city,
+      country: result.country || selectedPhoto.country,
+      latitude: result.latitude,
+      longitude: result.longitude
+    });
+  }
+
   return (
     <main className="container stack">
       <div>
@@ -355,7 +367,7 @@ export function HomePage() {
                 </label>
               </div>
               <span className="small">Tip: click on the map while this photo is selected to set its position.</span>
-              <div className="row">
+              <div className="row" style={{ alignItems: 'flex-start' }}>
                 <label>
                   Country
                   <input
@@ -363,13 +375,20 @@ export function HomePage() {
                     onChange={(e) => setSelectedPhoto({ ...selectedPhoto, country: e.target.value })}
                   />
                 </label>
-                <label>
-                  City
-                  <input
-                    value={selectedPhoto.city ?? ''}
-                    onChange={(e) => setSelectedPhoto({ ...selectedPhoto, city: e.target.value })}
-                  />
-                </label>
+                <LocationAutocomplete
+                  label="City"
+                  value={selectedPhoto.city ?? ''}
+                  placeholder="Start typing a city or place"
+                  onChange={(value) =>
+                    setSelectedPhoto({
+                      ...selectedPhoto,
+                      city: value,
+                      latitude: null,
+                      longitude: null
+                    })
+                  }
+                  onSelect={applyLocation}
+                />
               </div>
               <div className="row">
                 <button type="button" onClick={savePhoto}>Save changes</button>
