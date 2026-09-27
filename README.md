@@ -10,6 +10,8 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Per-user photo ownership
 - Google Photos OAuth connect / disconnect
 - Google Photos media listing and manual import into Photo Geo
+- Amazon Photos OAuth connect / disconnect
+- Amazon Photos media listing and manual import into Photo Geo
 - Upload one or more photos from local file system
 - Stronger upload validation by MIME type and size
 - Basic duplicate detection by SHA-256 hash per user
@@ -53,12 +55,16 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/providers/google/callback
 ```
 
-Required OAuth scopes:
+## Amazon Photos setup
 
-- `openid`
-- `email`
-- `profile`
-- `https://www.googleapis.com/auth/photoslibrary.readonly`
+Create an Amazon Login with Amazon OAuth app and set these environment variables in `.env.local`:
+
+```bash
+AMAZON_CLIENT_ID=your-client-id
+AMAZON_CLIENT_SECRET=your-client-secret
+AMAZON_REDIRECT_URI=http://localhost:3000/api/providers/amazon/callback
+AMAZON_PHOTOS_API_BASE_URL=https://photos.amazon.com/api/v1
+```
 
 ## Setup
 
@@ -98,15 +104,14 @@ npm test
 ## Notes
 
 - The MVP stores uploaded files locally in `uploads/`.
-- Google Photos import is manual in this version: list media, then import selected items.
+- Google Photos and Amazon Photos import are manual in this version: list media, then import selected items.
 - Reverse geocoding is not implemented to avoid requiring third-party API keys.
 - SQLite is used for simplicity. The data model is compatible with a future move to PostgreSQL.
 - Authentication is local/dev-oriented and not intended as production-grade security.
 
 ## Future work
 
-- Automatic incremental sync from Google Photos
-- Amazon Photos integration
+- Automatic incremental sync from providers
 - Real auth provider integration
 - Cloud storage adapter for S3
 - Reverse geocoding for automatic city/country suggestions
