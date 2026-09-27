@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import type { InputHTMLAttributes } from 'react';
 import type { PhotoRecord } from '@/types/photo';
 import { uploadConstraints } from '@/lib/validators';
 import { LocationAutocomplete, type GeocodeResult } from '@/components/location-autocomplete';
@@ -20,6 +21,12 @@ const emptyFilters = {
 };
 
 type PhotoListTab = 'all' | 'missing-geolocation' | 'by-location';
+
+type DirectoryFileInputProps = InputHTMLAttributes<HTMLInputElement>;
+
+function DirectoryFileInput(props: DirectoryFileInputProps) {
+  return <input {...props} {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} />;
+}
 
 export function HomePage() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
@@ -415,10 +422,11 @@ export function HomePage() {
                 }}
               >
                 <strong>Drag & drop photos here</strong>
-                <span className="small">or select one or more files below</span>
+                <span className="small">or select one or more files or an entire folder below</span>
+                <span className="small">Folder selection scans subfolders recursively when supported by the browser</span>
                 <span className="small">Accepted: JPEG, PNG, WEBP, GIF · max {Math.round(uploadConstraints.maxFileSizeBytes / (1024 * 1024))}MB each</span>
               </div>
-              <input name="files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+              <DirectoryFileInput name="files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
               <button type="submit" disabled={uploading}>
                 {uploading ? 'Uploading…' : 'Upload selected photos'}
               </button>
