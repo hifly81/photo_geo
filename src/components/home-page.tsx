@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { PhotoRecord } from '@/types/photo';
+import { uploadConstraints } from '@/lib/validators';
 
 const PhotoMap = dynamic(() => import('@/components/photo-map').then((mod) => mod.PhotoMap), {
   ssr: false
@@ -50,6 +52,20 @@ export function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  function validateFiles(files: File[]) {
+    const invalidMime = files.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type));
+    if (invalidMime) {
+      return `Unsupported file type: ${invalidMime.name}`;
+    }
+
+    const oversized = files.find((file) => file.size > uploadConstraints.maxFileSizeBytes);
+    if (oversized) {
+      return `File too large: ${oversized.name}. Max size is ${Math.round(uploadConstraints.maxFileSizeBytes / (1024 * 1024))}MB.`;
+    }
+
+    return null;
+  }
+
   async function uploadFiles(files: FileList | File[]) {
     setError(null);
     setSuccessMessage(null);
@@ -57,6 +73,12 @@ export function HomePage() {
     const validFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
     if (validFiles.length === 0) {
       setError('Please select at least one image file.');
+      return;
+    }
+
+    const validationError = validateFiles(validFiles);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -75,7 +97,13 @@ export function HomePage() {
         throw new Error(data.error ?? 'Upload failed');
       }
 
-      setSuccessMessage(`${data.photos?.length ?? validFiles.length} photo(s) uploaded successfully.`);
+      const uploadedCount = data.photos?.length ?? validFiles.length;
+      const duplicateCount = data.duplicates?.length ?? 0;
+      setSuccessMessage(
+        duplicateCount > 0
+          ? `${uploadedCount} photo(s) uploaded, ${duplicateCount} duplicate(s) skipped.`
+          : `${uploadedCount} photo(s) uploaded successfully.`
+      );
       await loadPhotos();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
@@ -225,8 +253,9 @@ export function HomePage() {
               >
                 <strong>Drag & drop photos here</strong>
                 <span className="small">or select one or more files below</span>
+                <span className="small">Accepted: JPEG, PNG, WEBP, GIF · max {Math.round(uploadConstraints.maxFileSizeBytes / (1024 * 1024))}MB each</span>
               </div>
-              <input name="files" type="file" accept="image/*" multiple />
+              <input name="files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
               <button type="submit" disabled={uploading}>
                 {uploading ? 'Uploading…' : 'Upload selected photos'}
               </button>
@@ -269,7 +298,10 @@ export function HomePage() {
 
           {selectedPhoto && (
             <section className="card stack">
-              <h2>Edit photo</h2>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0 }}>Edit photo</h2>
+                <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
+              </div>
               <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
               <div className="small">{selectedPhoto.originalFilename}</div>
               <label>
@@ -397,6 +429,7 @@ export function HomePage() {
                         <span key={tag.id} className="tag">{tag.name}</span>
                       ))}
                     </div>
+                    <Link href={`/photos/${photo.id}`}>View details</Link>
                   </div>
                 </article>
               ))}

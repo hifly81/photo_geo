@@ -5,6 +5,8 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 ## Features
 
 - Upload one or more photos from local file system
+- Stronger upload validation by MIME type and size
+- Basic duplicate detection by SHA-256 hash
 - Store files on the server in `uploads/`
 - Extract EXIF metadata when available
 - Save photo records with Prisma + SQLite
@@ -13,8 +15,10 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Edit photo metadata and coordinates
 - Delete photos
 - Click on the map to set or update a photo position
+- Dedicated photo detail page
 - View geolocated photos on a Leaflet map
 - Placeholder import provider layer for Google Photos / Amazon Photos
+- Basic API tests for core routes
 
 ## Tech stack
 
@@ -23,6 +27,7 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Leaflet + React Leaflet
 - Zod for validation
 - EXIF parsing with `exifr`
+- Node test runner for API-focused tests
 
 ## Project structure
 
@@ -31,6 +36,7 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - `src/lib` – database, validation, EXIF, storage helpers
 - `src/providers` – placeholder provider connectors for future Google Photos / Amazon Photos support
 - `src/types` – shared frontend types
+- `src/test` – basic API and utility tests
 - `prisma` – schema and local SQLite database
 - `uploads` – local file storage for uploaded images
 
@@ -61,7 +67,13 @@ npm run seed
 npm run dev
 ```
 
-5. Open the app at `http://localhost:3000`
+5. Run tests:
+
+```bash
+npm test
+```
+
+6. Open the app at `http://localhost:3000`
 
 ## Notes
 
@@ -72,6 +84,7 @@ npm run dev
 - SQLite is used for simplicity. The data model is compatible with a future move to PostgreSQL.
 - There is a stub mobile app scaffold in `mobile/` to document the future Expo app direction.
 - There is a storage adapter abstraction ready for a future S3-backed implementation.
+- Duplicate detection is best-effort for the local MVP and uses file hashes.
 
 ## Future work
 

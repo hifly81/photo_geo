@@ -1,6 +1,6 @@
 {
   "name": "photo_geo",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,8 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "seed": "node prisma/seed.mjs"
+    "seed": "node prisma/seed.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

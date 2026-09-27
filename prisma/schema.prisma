@@ -12,6 +12,7 @@ model Photo {
   originalFilename String
   storagePath      String
   source           String
+  fileHash         String?   @unique
   takenAt          DateTime?
   latitude         Float?
   longitude        Float?

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 const uploadDir = path.join(process.cwd(), 'uploads');
 
@@ -46,4 +46,8 @@ export async function deleteStoredFileByRelativePath(relativePath: string) {
 
 export async function cleanupTempFile(tempPath: string) {
   await fs.unlink(tempPath).catch(() => null);
+}
+
+export function calculateFileHash(buffer: Buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
 }

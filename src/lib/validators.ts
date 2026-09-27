@@ -24,3 +24,8 @@ export const tagSchema = z.object({
 export const photoTagSchema = z.object({
   tagName: z.string().trim().min(1).max(50)
 });
+
+export const uploadConstraints = {
+  maxFileSizeBytes: 10 * 1024 * 1024,
+  allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+};
