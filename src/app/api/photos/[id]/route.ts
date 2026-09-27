@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       caption: data.caption ?? existing.caption,
       country: data.country ?? existing.country,
       city: data.city ?? existing.city,
+      placeName: data.placeName ?? existing.placeName,
       latitude: data.latitude ?? existing.latitude,
       longitude: data.longitude ?? existing.longitude,
       takenAt: data.takenAt !== undefined ? (data.takenAt ? new Date(data.takenAt) : null) : existing.takenAt
@@ -80,7 +81,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload', details: parseResult.error.flatten() }, { status: 400 });
   }
 
-  const { ids, city, country, latitude, longitude } = parseResult.data;
+  const { ids, city, country, placeName, latitude, longitude } = parseResult.data;
 
   const result = await prisma.photo.updateMany({
     where: {
@@ -89,6 +90,7 @@ export async function PUT(request: NextRequest) {
     data: {
       city,
       country,
+      placeName,
       latitude,
       longitude
     }

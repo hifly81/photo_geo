@@ -14,6 +14,7 @@ export const updatePhotoSchema = z.object({
   longitude: z.number().min(-180).max(180).nullable().optional(),
   country: z.string().max(100).nullable().optional(),
   city: z.string().max(100).nullable().optional(),
+  placeName: z.string().max(200).nullable().optional(),
   caption: z.string().max(500).nullable().optional()
 });
 
@@ -22,7 +23,8 @@ export const bulkUpdatePhotosSchema = z.object({
   latitude: z.number().min(-90).max(90).nullable(),
   longitude: z.number().min(-180).max(180).nullable(),
   country: z.string().max(100).nullable(),
-  city: z.string().max(100).nullable()
+  city: z.string().max(100).nullable(),
+  placeName: z.string().max(200).nullable().optional()
 });
 
 export const tagSchema = z.object({

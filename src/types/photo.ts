@@ -15,6 +15,7 @@ export type PhotoRecord = {
   longitude: number | null;
   country: string | null;
   city: string | null;
+  placeName: string | null;
   caption: string | null;
   tags: PhotoTagItem[];
 };

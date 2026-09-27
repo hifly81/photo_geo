@@ -131,8 +131,8 @@ export function HomePage() {
   }, [availableCities, availableCountries, locationCity, locationCountry]);
 
   useEffect(() => {
-    setPlaceQuery(selectedPhoto?.city ?? '');
-  }, [selectedPhoto?.id, selectedPhoto?.city]);
+    setPlaceQuery(selectedPhoto?.placeName ?? selectedPhoto?.city ?? '');
+  }, [selectedPhoto?.id, selectedPhoto?.placeName, selectedPhoto?.city]);
 
   function validateFiles(files: File[]) {
     const invalidMime = files.find((file) => !uploadConstraints.allowedMimeTypes.includes(file.type));
@@ -216,6 +216,7 @@ export function HomePage() {
         caption: selectedPhoto.caption,
         country: selectedPhoto.country,
         city: selectedPhoto.city,
+        placeName: selectedPhoto.placeName,
         latitude: selectedPhoto.latitude,
         longitude: selectedPhoto.longitude,
         takenAt: selectedPhoto.takenAt
@@ -235,6 +236,7 @@ export function HomePage() {
   async function saveSelectedPhotosLocation(location: {
     city: string | null;
     country: string | null;
+    placeName?: string | null;
     latitude: number | null;
     longitude: number | null;
   }) {
@@ -336,6 +338,7 @@ export function HomePage() {
     const location = {
       city: result.city || selectedPhoto.city,
       country: result.country || selectedPhoto.country,
+      placeName: result.name || selectedPhoto.placeName || selectedPhoto.city,
       latitude: result.latitude,
       longitude: result.longitude
     };
@@ -536,7 +539,7 @@ export function HomePage() {
                       setPlaceQuery(value);
                       setSelectedPhoto({
                         ...selectedPhoto,
-                        city: value,
+                        placeName: value,
                         latitude: null,
                         longitude: null
                       });
@@ -562,6 +565,7 @@ export function HomePage() {
                       void saveSelectedPhotosLocation({
                         city: selectedPhoto.city ?? null,
                         country: selectedPhoto.country ?? null,
+                        placeName: selectedPhoto.placeName ?? null,
                         latitude: selectedPhoto.latitude ?? null,
                         longitude: selectedPhoto.longitude ?? null
                       });
@@ -608,6 +612,7 @@ export function HomePage() {
                   void saveSelectedPhotosLocation({
                     city: nextPhoto.city ?? null,
                     country: nextPhoto.country ?? null,
+                    placeName: nextPhoto.placeName ?? null,
                     latitude: lat,
                     longitude: lng
                   });
@@ -699,7 +704,11 @@ export function HomePage() {
                     <div className="stack">
                       <strong>{photo.originalFilename}</strong>
                       <span className="small">{photo.takenAt ? new Date(photo.takenAt).toLocaleString() : 'No date'}</span>
-                      <span className="small">{photo.country || photo.city ? `${photo.city ?? ''} ${photo.country ?? ''}`.trim() : 'No location label'}</span>
+                      <span className="small">
+                        {photo.placeName || photo.country || photo.city
+                          ? [photo.placeName, photo.city, photo.country].filter(Boolean).join(' · ')
+                          : 'No location label'}
+                      </span>
                       <div className="tag-list">
                         {photo.tags.map(({ tag }) => (
                           <span key={tag.id} className="tag">{tag.name}</span>

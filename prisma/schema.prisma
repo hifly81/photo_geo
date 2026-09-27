@@ -45,6 +45,7 @@ model Photo {
   longitude        Float?
   country          String?
   city             String?
+  placeName        String?
   caption          String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
