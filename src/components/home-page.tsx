@@ -22,7 +22,7 @@ const emptyFilters = {
 
 const uploadBatchSize = 50;
 
-type PhotoListTab = 'all' | 'missing-geolocation' | 'by-location';
+type PhotoListTab = 'all' | 'with-geolocation' | 'missing-geolocation' | 'by-location';
 
 type DirectoryFileInputProps = InputHTMLAttributes<HTMLInputElement>;
 
@@ -84,6 +84,11 @@ export function HomePage() {
     [photos]
   );
 
+  const photosWithGeolocation = useMemo(
+    () => photos.filter((photo) => photo.latitude != null && photo.longitude != null),
+    [photos]
+  );
+
   const availableCountries = useMemo(
     () => Array.from(new Set(photos.map((photo) => photo.country?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b)),
     [photos]
@@ -108,6 +113,10 @@ export function HomePage() {
   }, [locationCity, locationCountry, photos]);
 
   const visiblePhotos = useMemo(() => {
+    if (photoListTab === 'with-geolocation') {
+      return photosWithGeolocation;
+    }
+
     if (photoListTab === 'missing-geolocation') {
       return photosWithoutGeolocation;
     }
@@ -117,7 +126,7 @@ export function HomePage() {
     }
 
     return photos;
-  }, [locationFilteredPhotos, photoListTab, photos, photosWithoutGeolocation]);
+  }, [locationFilteredPhotos, photoListTab, photos, photosWithGeolocation, photosWithoutGeolocation]);
 
   const selectedPhotosCount = selectedPhotoIds.length;
   const isMultiSelection = selectedPhotosCount > 1;
@@ -688,6 +697,13 @@ export function HomePage() {
                 onClick={() => setPhotoListTab('all')}
               >
                 All photos ({photos.length})
+              </button>
+              <button
+                type="button"
+                className={photoListTab === 'with-geolocation' ? '' : 'secondary'}
+                onClick={() => setPhotoListTab('with-geolocation')}
+              >
+                With geolocation ({photosWithGeolocation.length})
               </button>
               <button
                 type="button"
