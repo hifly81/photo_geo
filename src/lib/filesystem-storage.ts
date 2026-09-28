@@ -5,9 +5,9 @@ import { createHash } from 'node:crypto';
 const DEFAULT_STORAGE_KEY = 'main';
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
-type StorageRoots = Record<string, string>;
+export type StorageRoots = Record<string, string>;
 
-type ScannedPhotoFile = {
+export type ScannedPhotoFile = {
   storageKey: string;
   filePath: string;
   absolutePath: string;
@@ -40,9 +40,9 @@ function parseStorageRoots(value: string | undefined): StorageRoots {
     return Object.fromEntries(entries.map(([key, rootPath]) => [key, path.resolve(rootPath)]));
   } catch (error) {
     throw new Error(
-      error instanceof Error
-        ? `Invalid PHOTO_STORAGE_ROOTS configuration: ${error.message}`
-        : 'Invalid PHOTO_STORAGE_ROOTS configuration'
+        error instanceof Error
+            ? `Invalid PHOTO_STORAGE_ROOTS configuration: ${error.message}`
+            : 'Invalid PHOTO_STORAGE_ROOTS configuration'
     );
   }
 }
@@ -68,6 +68,25 @@ export function getDefaultPhotoStorageKey() {
   }
 
   return Object.keys(roots)[0];
+}
+
+export function getUploadPhotoStorageKey() {
+  const configured = process.env.PHOTO_UPLOAD_STORAGE_KEY?.trim();
+  const roots = getPhotoStorageRoots();
+
+  if (configured) {
+    if (!(configured in roots)) {
+      throw new Error(`PHOTO_UPLOAD_STORAGE_KEY references unknown storage root: ${configured}`);
+    }
+
+    return configured;
+  }
+
+  if ('uploads' in roots) {
+    return 'uploads';
+  }
+
+  return getDefaultPhotoStorageKey();
 }
 
 export function getPhotoStorageRoot(storageKey: string) {
@@ -124,6 +143,17 @@ export async function fileExistsInStorage(storageKey: string, filePath: string) 
   try {
     const stats = await fs.stat(absolutePath);
     return stats.isFile();
+  } catch {
+    return false;
+  }
+}
+
+export async function directoryExistsInStorage(storageKey: string, directoryPath: string) {
+  const absolutePath = resolvePhotoAbsolutePath(storageKey, directoryPath);
+
+  try {
+    const stats = await fs.stat(absolutePath);
+    return stats.isDirectory();
   } catch {
     return false;
   }

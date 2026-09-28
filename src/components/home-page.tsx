@@ -871,6 +871,9 @@ export function HomePage() {
                         {photo.originalFilename}
                       </strong>
                       <span className="small">{photo.takenAt ? new Date(photo.takenAt).toLocaleString() : 'No date'}</span>
+                      {'missingFromDisk' in photo && photo.missingFromDisk ? (
+                          <span className="small" style={{ color: '#b42318' }}>Missing from disk</span>
+                      ) : null}
                       <span className="small">
                         {photo.placeName || photo.country || photo.city
                           ? [photo.placeName, photo.city, photo.country].filter(Boolean).join(' · ')

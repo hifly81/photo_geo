@@ -4,6 +4,7 @@ import { saveUploadedFile, writeBufferToTempFile, cleanupTempFile, calculateFile
 import { extractPhotoMetadata } from '@/lib/exif';
 import { uploadConstraints } from '@/lib/validators';
 import { requireCurrentUser } from '@/lib/auth';
+import { getUploadPhotoStorageKey } from '@/lib/filesystem-storage';
 
 export const runtime = 'nodejs';
 
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
     const createdPhotos = [];
     const duplicates = [];
     const failed: FailedUpload[] = [];
+    const uploadStorageKey = getUploadPhotoStorageKey();
 
     for (const file of files) {
       const normalizedOriginalFilename = file.name.trim();
@@ -60,13 +62,12 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const fileHash = calculateFileHash(buffer);
+
         const existing = await prisma.photo.findFirst({
           where: {
             userId: user.id,
-            OR: [
-              { fileHash },
-              { originalFilename: normalizedOriginalFilename }
-            ]
+            fileHash,
+            source: 'upload'
           }
         });
 
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
             id: existing.id,
             originalFilename: existing.originalFilename,
             fileHash: existing.fileHash,
-            reason: existing.originalFilename === normalizedOriginalFilename ? 'path' : 'hash'
+            reason: 'hash'
           });
           continue;
         }
@@ -88,12 +89,15 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             originalFilename: normalizedOriginalFilename,
-            storagePath: stored.relativePath,
+            storageKey: uploadStorageKey,
+            filePath: stored.filename,
             source: 'upload',
             fileHash,
             takenAt: metadata.takenAt,
             latitude: metadata.latitude,
-            longitude: metadata.longitude
+            longitude: metadata.longitude,
+            lastSeenAt: new Date(),
+            missingFromDisk: false
           },
           include: {
             tags: {
@@ -124,11 +128,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ photos: createdPhotos, duplicates, failed }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: 'Upload failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 400 }
+        {
+          error: 'Upload failed',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 400 }
     );
   }
 }

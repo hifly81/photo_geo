@@ -15,7 +15,6 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Upload one or more photos from local file system
 - Stronger upload validation by MIME type and size
 - Basic duplicate detection by SHA-256 hash per user
-- Store files on the server in `uploads/`
 - Extract EXIF metadata when available
 - Save photo records with Prisma + SQLite
 - Search photos by date, country, city, and tag
@@ -26,6 +25,30 @@ MVP web app to upload photos, store metadata, place them on a map, and edit tags
 - Dedicated photo detail page
 - View geolocated photos on a Leaflet map
 - Basic API and utility tests for core routes/helpers
+- 
+## Filesystem sync setup
+
+You can configure one or more server-side photo roots with environment variables:
+
+```bash
+PHOTO_STORAGE_ROOTS='{"main":"/photo","uploads":"./uploads"}'
+PHOTO_DEFAULT_STORAGE_KEY=main
+PHOTO_UPLOAD_STORAGE_KEY=uploads
+```
+
+Then, from the UI, you can configure relative folders under a storage root and run a recursive filesystem sync.
+
+This sync saves only `storageKey` + `filePath` references in the database and does not copy synced files into `uploads/`.
+
+### Duplicate files
+
+The filesystem sync treats each physical path as a separate photo reference.
+That means two files with the same content hash can coexist if they are stored in different folders or storage roots.
+
+Identity is based on:
+- `userId`
+- `storageKey`
+- `filePath`
 
 ## Tech stack
 

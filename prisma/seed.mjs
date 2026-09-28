@@ -35,7 +35,8 @@ async function ensureDemoPhoto(userId) {
     data: {
       userId,
       originalFilename: 'demo-rome.jpg',
-      storagePath: '/api/files/demo-rome.jpg',
+      storageKey: 'uploads',
+      filePath: 'demo-rome.jpg',
       source: 'seed',
       sourceItemId: 'seed-demo-rome',
       fileHash: 'seed-demo-rome-hash',
@@ -76,11 +77,11 @@ async function main() {
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (error) => {
-    console.error(error);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+    .then(async () => {
+      await prisma.$disconnect();
+    })
+    .catch(async (error) => {
+      console.error(error);
+      await prisma.$disconnect();
+      process.exit(1);
+    });

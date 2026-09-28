@@ -1,12 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getPhoto, removeOrphanTags, mapPhotoForClient } from '@/lib/photos';
+import { getPhotoForUser, removeOrphanTags, mapPhotoForClient } from '@/lib/photos';
 import { updatePhotoSchema, bulkUpdatePhotosSchema } from '@/lib/validators';
-import { deleteStoredFileByRelativePath } from '@/lib/storage';
+import { requireCurrentUser } from '@/lib/auth';
+import { resolvePhotoAbsolutePath } from '@/lib/filesystem-storage';
+import fs from 'node:fs/promises';
+
+export const runtime = 'nodejs';
+
+async function deletePhotoFile(storageKey: string, filePath: string) {
+  try {
+    const absolutePath = resolvePhotoAbsolutePath(storageKey, filePath);
+    await fs.unlink(absolutePath);
+  } catch {
+    // ignore missing/unremovable file
+  }
+}
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { id } = await context.params;
-  const photo = await getPhoto(id);
+  const photo = await getPhotoForUser(id, user.id);
 
   if (!photo) {
     return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
@@ -16,6 +35,12 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { id } = await context.params;
   const body = await request.json();
   const parseResult = updatePhotoSchema.safeParse(body);
@@ -26,7 +51,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   const data = parseResult.data;
 
-  const existing = await prisma.photo.findUnique({ where: { id } });
+  const existing = await prisma.photo.findFirst({
+    where: {
+      id,
+      userId: user.id
+    }
+  });
+
   if (!existing) {
     return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
   }
@@ -55,8 +86,19 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 }
 
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { id } = await context.params;
-  const existing = await prisma.photo.findUnique({ where: { id } });
+  const existing = await prisma.photo.findFirst({
+    where: {
+      id,
+      userId: user.id
+    }
+  });
 
   if (!existing) {
     return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
@@ -67,13 +109,22 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     await tx.photo.delete({ where: { id } });
   });
 
-  await deleteStoredFileByRelativePath(existing.storagePath);
+  if (existing.source === 'upload') {
+    await deletePhotoFile(existing.storageKey, existing.filePath);
+  }
+
   await removeOrphanTags();
 
   return NextResponse.json({ ok: true });
 }
 
 export async function PUT(request: NextRequest) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const body = await request.json();
   const parseResult = bulkUpdatePhotosSchema.safeParse(body);
 
@@ -85,7 +136,8 @@ export async function PUT(request: NextRequest) {
 
   const result = await prisma.photo.updateMany({
     where: {
-      id: { in: ids }
+      id: { in: ids },
+      userId: user.id
     },
     data: {
       city,
@@ -96,5 +148,5 @@ export async function PUT(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ updated: result.count });
+  return NextResponse.json({ ok: true, updated: result.count });
 }
