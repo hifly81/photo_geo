@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getPhoto, removeOrphanTags } from '@/lib/photos';
+import { getPhoto, removeOrphanTags, mapPhotoForClient } from '@/lib/photos';
 import { updatePhotoSchema, bulkUpdatePhotosSchema } from '@/lib/validators';
 import { deleteStoredFileByRelativePath } from '@/lib/storage';
 
@@ -12,7 +12,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ photo });
+  return NextResponse.json({ photo: mapPhotoForClient(photo) });
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -51,7 +51,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     }
   });
 
-  return NextResponse.json({ photo });
+  return NextResponse.json({ photo: mapPhotoForClient(photo) });
 }
 
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
