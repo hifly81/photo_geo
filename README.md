@@ -38,8 +38,6 @@ PHOTO_UPLOAD_STORAGE_KEY=uploads
 
 Then, from the UI, you can configure relative folders under a storage root and run a recursive filesystem sync.
 
-This sync saves only `storageKey` + `filePath` references in the database and does not copy synced files into `uploads/`.
-
 ### Duplicate files
 
 The filesystem sync treats each physical path as a separate photo reference.
@@ -123,19 +121,3 @@ npm test
 ```
 
 6. Open the app at `http://localhost:3000`
-
-## Notes
-
-- The MVP stores uploaded files locally in `uploads/`.
-- Google Photos and Amazon Photos import are manual in this version: list media, then import selected items.
-- Reverse geocoding is not implemented to avoid requiring third-party API keys.
-- SQLite is used for simplicity. The data model is compatible with a future move to PostgreSQL.
-- Authentication is local/dev-oriented and not intended as production-grade security.
-
-## Future work
-
-- Automatic incremental sync from providers
-- Real auth provider integration
-- Cloud storage adapter for S3
-- Reverse geocoding for automatic city/country suggestions
-- Marker clustering on the map
