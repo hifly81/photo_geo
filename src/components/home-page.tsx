@@ -546,7 +546,33 @@ export function HomePage() {
                 <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                 <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
               </div>
-              <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
+              <div style={{ position: 'relative' }}>
+                <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={deletePhoto}
+                  disabled={isMultiSelection}
+                  aria-label="Delete photo"
+                  title="Delete photo"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 32,
+                    height: 32,
+                    borderRadius: '999px',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                    lineHeight: 1
+                  }}
+                >
+                  ×
+                </button>
+              </div>
               <div className="small">{selectedPhoto.originalFilename}</div>
               {isMultiSelection && <div className="small">Shift + click selection active. Geo/city/country changes apply to all selected photos.</div>}
               <label>
