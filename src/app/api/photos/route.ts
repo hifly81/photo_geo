@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { photoFiltersSchema } from '@/lib/validators';
-import { listPhotos } from '@/lib/photos';
+import { listPhotos, mapPhotosForClient } from '@/lib/photos';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -17,5 +17,5 @@ export async function GET(request: NextRequest) {
   }
 
   const photos = await listPhotos(user.id, parseResult.data);
-  return NextResponse.json({ photos });
+  return NextResponse.json({ photos: mapPhotosForClient(photos) });
 }
