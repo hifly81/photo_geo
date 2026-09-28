@@ -349,12 +349,12 @@ export function HomePage() {
     await loadPhotos();
   }
 
-  async function deletePhoto() {
-    if (!selectedPhoto) return;
+  async function deletePhoto(photoToDelete: PhotoRecord | null = selectedPhoto) {
+    if (!photoToDelete) return;
     setError(null);
     setSuccessMessage(null);
 
-    const response = await fetch(`/api/photos/${selectedPhoto.id}`, {
+    const response = await fetch(`/api/photos/${photoToDelete.id}`, {
       method: 'DELETE'
     });
 
@@ -364,8 +364,8 @@ export function HomePage() {
       return;
     }
 
-    setSelectedPhoto(null);
-    setSelectedPhotoIds((current) => current.filter((id) => id !== selectedPhoto.id));
+    setSelectedPhoto((current) => (current?.id === photoToDelete.id ? null : current));
+    setSelectedPhotoIds((current) => current.filter((id) => id !== photoToDelete.id));
     setSuccessMessage('Photo deleted successfully.');
     await loadPhotos();
   }
@@ -546,33 +546,7 @@ export function HomePage() {
                 <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                 <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
               </div>
-              <div style={{ position: 'relative' }}>
-                <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={deletePhoto}
-                  disabled={isMultiSelection}
-                  aria-label="Delete photo"
-                  title="Delete photo"
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 32,
-                    height: 32,
-                    borderRadius: '999px',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 18,
-                    lineHeight: 1
-                  }}
-                >
-                  ×
-                </button>
-              </div>
+              <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
               <div className="small">{selectedPhoto.originalFilename}</div>
               {isMultiSelection && <div className="small">Shift + click selection active. Geo/city/country changes apply to all selected photos.</div>}
               <label>
@@ -684,7 +658,7 @@ export function HomePage() {
                 >
                   {isMultiSelection ? `Apply location to ${selectedPhotosCount} photos` : 'Save changes'}
                 </button>
-                <button type="button" className="danger" onClick={deletePhoto} disabled={isMultiSelection}>Delete photo</button>
+                <button type="button" className="danger" onClick={() => void deletePhoto()} disabled={isMultiSelection}>Delete photo</button>
               </div>
 
               <div className="stack">
@@ -819,8 +793,35 @@ export function HomePage() {
                     key={photo.id}
                     className="photo-card card"
                     onClick={(event) => handlePhotoSelection(photo, event)}
-                    style={{ cursor: 'pointer', border: isSelected ? '2px solid #0f62fe' : undefined }}
+                    style={{ cursor: 'pointer', border: isSelected ? '2px solid #0f62fe' : undefined, position: 'relative' }}
                   >
+                    <button
+                      type="button"
+                      className="danger"
+                      aria-label={`Delete ${photo.originalFilename}`}
+                      title="Delete photo"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deletePhoto(photo);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        width: 28,
+                        height: 28,
+                        borderRadius: '999px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                        lineHeight: 1,
+                        zIndex: 1
+                      }}
+                    >
+                      ×
+                    </button>
                     <img src={photo.storagePath} alt={photo.originalFilename} />
                     <div className="stack">
                       <strong>{photo.originalFilename}</strong>
