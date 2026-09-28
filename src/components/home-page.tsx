@@ -563,7 +563,14 @@ export function HomePage() {
           </section>
 
           {selectedPhoto && (
-            <section className="card stack">
+            <section
+              className="card stack"
+              style={{
+                position: 'sticky',
+                top: 16,
+                alignSelf: 'start'
+              }}
+            >
               <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                 <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
