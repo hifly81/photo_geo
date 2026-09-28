@@ -36,7 +36,8 @@ model Photo {
   id               String    @id @default(cuid())
   userId           String
   originalFilename String
-  storagePath      String
+  storageKey       String
+  filePath         String
   source           String
   sourceItemId     String?
   fileHash         String?
@@ -54,6 +55,7 @@ model Photo {
 
   @@unique([userId, fileHash])
   @@unique([userId, source, sourceItemId])
+  @@unique([userId, storageKey, filePath])
 }
 
 model Tag {
