@@ -14,9 +14,9 @@ export function IntegrationsPanel() {
     <section className="card stack">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ marginBottom: 4 }}>Integrazioni</h2>
+          <h2 style={{ marginBottom: 4 }}>Providers</h2>
           <p className="small">
-            Collega i provider esterni e importa manualmente le foto nel tuo archivio Photo Geo.
+            Synch your external media provider.
           </p>
         </div>
         <button
@@ -26,7 +26,7 @@ export function IntegrationsPanel() {
           aria-expanded={isOpen}
           aria-controls="integrations-panel-content"
         >
-          {isOpen ? 'Chiudi' : 'Apri'}
+          {isOpen ? 'Close' : 'Open'}
         </button>
       </div>
 
