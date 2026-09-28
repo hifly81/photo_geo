@@ -575,7 +575,7 @@ export function HomePage() {
                 <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                 <Link href={`/photos/${selectedPhoto.id}`}>Open detail page</Link>
               </div>
-              <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
+              <img src={selectedPhoto.imageUrl} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
               <div className="small">{selectedPhoto.originalFilename}</div>
               {isMultiSelection && <div className="small">Shift + click selection active. Ctrl/Cmd + click toggles photos across rows.</div>}
               <label>
@@ -856,7 +856,7 @@ export function HomePage() {
                     >
                       ×
                     </button>
-                    <img src={photo.storagePath} alt={photo.originalFilename} />
+                    <img src={photo.imageUrl} alt={photo.originalFilename} />
                     <div className="stack" style={{ minWidth: 0 }}>
                       <strong
                         style={{
