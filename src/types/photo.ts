@@ -8,7 +8,9 @@ export type PhotoTagItem = {
 export type PhotoRecord = {
   id: string;
   originalFilename: string;
-  storagePath: string;
+  storageKey: string;
+  filePath: string;
+  imageUrl: string;
   source: string;
   takenAt: string | null;
   latitude: number | null;
