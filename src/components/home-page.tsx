@@ -441,10 +441,32 @@ export function HomePage() {
       if (lastIndex >= 0 && currentIndex >= 0) {
         const [start, end] = lastIndex < currentIndex ? [lastIndex, currentIndex] : [currentIndex, lastIndex];
         const rangeIds = visiblePhotos.slice(start, end + 1).map((item) => item.id);
-        setSelectedPhotoIds(rangeIds);
+        const clickedPhotoWasSelected = selectedPhotoIds.includes(photo.id);
+
+        setSelectedPhotoIds((current) => {
+          const next = new Set(current);
+          rangeIds.forEach((id) => {
+            if (clickedPhotoWasSelected) {
+              next.delete(id);
+            } else {
+              next.add(id);
+            }
+          });
+          return visiblePhotos.filter((item) => next.has(item.id)).map((item) => item.id);
+        });
       } else {
-        setSelectedPhotoIds([photo.id]);
+        setSelectedPhotoIds((current) =>
+          current.includes(photo.id)
+            ? current.filter((id) => id !== photo.id)
+            : [...current, photo.id]
+        );
       }
+    } else if (event.metaKey || event.ctrlKey) {
+      setSelectedPhotoIds((current) =>
+        current.includes(photo.id)
+          ? current.filter((id) => id !== photo.id)
+          : [...current, photo.id]
+      );
     } else {
       setSelectedPhotoIds([photo.id]);
     }
@@ -548,7 +570,7 @@ export function HomePage() {
               </div>
               <img src={selectedPhoto.storagePath} alt={selectedPhoto.originalFilename} style={{ width: '100%', borderRadius: 8 }} />
               <div className="small">{selectedPhoto.originalFilename}</div>
-              {isMultiSelection && <div className="small">Shift + click selection active. Geo/city/country changes apply to all selected photos.</div>}
+              {isMultiSelection && <div className="small">Shift + click selection active. Ctrl/Cmd + click toggles photos across rows.</div>}
               <label>
                 Caption
                 <textarea
@@ -783,7 +805,7 @@ export function HomePage() {
             <div className="small">
               {photoListTab === 'by-location'
                 ? 'Choose a country and a city to show only photos from that location.'
-                : 'Click to select one photo. Use Shift + click to select a range and apply the same geo/city/country.'}
+                : 'Click to select one photo. Shift + click extends a range, Ctrl/Cmd + click toggles photos.'}
             </div>
             <div className="photo-list">
               {visiblePhotos.map((photo) => {
@@ -793,7 +815,12 @@ export function HomePage() {
                     key={photo.id}
                     className="photo-card card"
                     onClick={(event) => handlePhotoSelection(photo, event)}
-                    style={{ cursor: 'pointer', border: isSelected ? '2px solid #0f62fe' : undefined, position: 'relative' }}
+                    style={{
+                      cursor: 'pointer',
+                      border: isSelected ? '2px solid #0f62fe' : undefined,
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
                   >
                     <button
                       type="button"
@@ -823,8 +850,19 @@ export function HomePage() {
                       ×
                     </button>
                     <img src={photo.storagePath} alt={photo.originalFilename} />
-                    <div className="stack">
-                      <strong>{photo.originalFilename}</strong>
+                    <div className="stack" style={{ minWidth: 0 }}>
+                      <strong
+                        style={{
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: '100%'
+                        }}
+                        title={photo.originalFilename}
+                      >
+                        {photo.originalFilename}
+                      </strong>
                       <span className="small">{photo.takenAt ? new Date(photo.takenAt).toLocaleString() : 'No date'}</span>
                       <span className="small">
                         {photo.placeName || photo.country || photo.city
