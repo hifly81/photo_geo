@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { buildPhotoUrl } from '@/lib/filesystem-storage';
 
 export async function listPhotos(userId: string, filters: {
   from?: string;
@@ -50,8 +51,19 @@ export async function getPhotoForUser(id: string, userId: string) {
   });
 }
 
-export function imageContentTypeFromPath(storagePath: string) {
-  const normalized = storagePath.toLowerCase();
+export function mapPhotoForClient<T extends { storageKey: string; filePath: string }>(photo: T) {
+  return {
+    ...photo,
+    imageUrl: buildPhotoUrl(photo.storageKey, photo.filePath)
+  };
+}
+
+export function mapPhotosForClient<T extends { storageKey: string; filePath: string }>(photos: T[]) {
+  return photos.map(mapPhotoForClient);
+}
+
+export function imageContentTypeFromPath(filePath: string) {
+  const normalized = filePath.toLowerCase();
   if (normalized.endsWith('.png')) return 'image/png';
   if (normalized.endsWith('.webp')) return 'image/webp';
   if (normalized.endsWith('.gif')) return 'image/gif';
