@@ -173,3 +173,13 @@ button.danger {
     grid-template-columns: 1fr;
   }
 }
+
+.sticky-editor-panel {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}

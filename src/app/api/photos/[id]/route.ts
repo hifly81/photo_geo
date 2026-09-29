@@ -3,19 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getPhotoForUser, removeOrphanTags, mapPhotoForClient } from '@/lib/photos';
 import { updatePhotoSchema, bulkUpdatePhotosSchema } from '@/lib/validators';
 import { requireCurrentUser } from '@/lib/auth';
-import { resolvePhotoAbsolutePath } from '@/lib/filesystem-storage';
-import fs from 'node:fs/promises';
 
 export const runtime = 'nodejs';
-
-async function deletePhotoFile(storageKey: string, filePath: string) {
-  try {
-    const absolutePath = resolvePhotoAbsolutePath(storageKey, filePath);
-    await fs.unlink(absolutePath);
-  } catch {
-    // ignore missing/unremovable file
-  }
-}
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const user = await requireCurrentUser();
@@ -108,10 +97,6 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     await tx.photoTag.deleteMany({ where: { photoId: id } });
     await tx.photo.delete({ where: { id } });
   });
-
-  if (existing.source === 'upload') {
-    await deletePhotoFile(existing.storageKey, existing.filePath);
-  }
 
   await removeOrphanTags();
 

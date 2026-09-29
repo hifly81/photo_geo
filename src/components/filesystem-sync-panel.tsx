@@ -35,6 +35,7 @@ export function FilesystemSyncPanel() {
     const [syncing, setSyncing] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isOpen, setIsOpen] = useState(false);
 
     async function loadFolders() {
         setLoading(true);
@@ -175,7 +176,50 @@ export function FilesystemSyncPanel() {
                 parts.push(`Folder errors: ${data.errors.length}`);
             }
 
-            parts.push('Duplicate content across different folders is allowed');
+            setMessage(parts.join(' · '));
+            await loadFolders();
+        } catch (syncError) {
+            setError(syncError instanceof Error ? syncError.message : 'Filesystem sync failed');
+        } finally {
+            setSyncing(false);
+        }
+    }
+
+    async function runFolderSync(folder: SyncFolder) {
+        setSyncing(true);
+        setError(null);
+        setMessage(null);
+
+        try {
+            const response = await fetch('/api/photos/fs-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folderId: folder.id
+                })
+            });
+
+            const data = (await response.json()) as SyncSummary & { error?: string; details?: string };
+
+            if (!response.ok) {
+                throw new Error(data.details ?? data.error ?? 'Filesystem sync failed');
+            }
+
+            const parts = [
+                `Folder synced: ${folder.folderPath}`,
+                `Files scanned: ${data.scannedFiles}`,
+                `Created: ${data.created}`,
+                `Updated: ${data.updated}`,
+                `Skipped: ${data.skipped}`
+            ];
+
+            if (data.missingMarked > 0) {
+                parts.push(`Missing marked: ${data.missingMarked}`);
+            }
+
+            if (data.errors.length > 0) {
+                parts.push(`Folder errors: ${data.errors.length}`);
+            }
 
             setMessage(parts.join(' · '));
             await loadFolders();
@@ -191,89 +235,117 @@ export function FilesystemSyncPanel() {
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                     <h2 style={{ marginBottom: 4 }}>Filesystem sync</h2>
-                    <div className="small">
+                    <p className="small">
                         Configure server-side folders to scan recursively and import photo references into the database.
-                    </div>
+                    </p>
                 </div>
-
-                <button type="button" onClick={() => void runSync()} disabled={syncing || enabledCount === 0}>
-                    {syncing ? 'Syncing…' : 'Run sync now'}
+                <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setIsOpen((current) => !current)}
+                    aria-expanded={isOpen}
+                    aria-controls="filesystem-sync-panel-content"
+                >
+                    {isOpen ? 'Close' : 'Open'}
                 </button>
             </div>
 
-            {error && <div className="card error-banner">{error}</div>}
-            {message && <div className="card success-banner">{message}</div>}
+            {isOpen && (
+                <>
+                    <div id="filesystem-sync-panel-content" className="stack">
+                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span className="small">
+                {loading ? 'Loading…' : `${folders.length} folder(s), ${enabledCount} enabled`}
+              </span>
+                            <button type="button" onClick={() => void runSync()} disabled={syncing || enabledCount === 0}>
+                                {syncing ? 'Syncing…' : 'Run sync for all enabled folders'}
+                            </button>
+                        </div>
 
-            <form onSubmit={addFolder} className="stack">
-                <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <label>
-                        Storage key
-                        <input
-                            value={storageKey}
-                            onChange={(event) => setStorageKey(event.target.value)}
-                            placeholder="main"
-                        />
-                    </label>
+                        <div className="small">
+                            The main sync scans every enabled folder. Use “Sync this folder” below to scan only one folder.
+                        </div>
 
-                    <label style={{ flex: 1, minWidth: 240 }}>
-                        Folder path
-                        <input
-                            value={folderPath}
-                            onChange={(event) => setFolderPath(event.target.value)}
-                            placeholder="e.g. trips/2024"
-                        />
-                    </label>
+                        {error && <div className="card error-banner">{error}</div>}
+                        {message && <div className="card success-banner">{message}</div>}
 
-                    <button type="submit" disabled={saving || !storageKey.trim() || !folderPath.trim()}>
-                        {saving ? 'Saving…' : 'Add folder'}
-                    </button>
-                </div>
+                        <form onSubmit={addFolder} className="stack">
+                            <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                                <label>
+                                    Storage key
+                                    <input
+                                        value={storageKey}
+                                        onChange={(event) => setStorageKey(event.target.value)}
+                                        placeholder="main"
+                                    />
+                                </label>
 
-                <div className="small">
-                    Use a path relative to the configured storage root. Subfolders are scanned recursively.
-                </div>
-            </form>
+                                <label style={{ flex: 1, minWidth: 240 }}>
+                                    Folder path
+                                    <input
+                                        value={folderPath}
+                                        onChange={(event) => setFolderPath(event.target.value)}
+                                        placeholder="e.g. trips/2024"
+                                    />
+                                </label>
 
-            <div className="stack">
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong>Configured folders</strong>
-                    <span className="small">{loading ? 'Loading…' : `${folders.length} folder(s), ${enabledCount} enabled`}</span>
-                </div>
+                                <button type="submit" disabled={saving || !storageKey.trim() || !folderPath.trim()}>
+                                    {saving ? 'Saving…' : 'Add folder'}
+                                </button>
+                            </div>
 
-                {folders.length === 0 && !loading ? (
-                    <div className="small">No sync folders configured yet.</div>
-                ) : (
-                    <div className="stack">
-                        {folders.map((folder) => (
-                            <article key={folder.id} className="card stack" style={{ padding: 12 }}>
-                                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                                    <div className="stack" style={{ gap: 4 }}>
-                                        <strong>{folder.folderPath}</strong>
-                                        <div className="small">Storage: {folder.storageKey}</div>
-                                        <div className="small">
-                                            Last scanned:{' '}
-                                            {folder.lastScannedAt ? new Date(folder.lastScannedAt).toLocaleString() : 'Never'}
-                                        </div>
-                                    </div>
+                            <div className="small">
+                                Use a path relative to the configured storage root. Subfolders are scanned recursively.
+                            </div>
+                        </form>
 
-                                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                                        <button type="button" className="secondary" onClick={() => void toggleFolder(folder)}>
-                                            {folder.enabled ? 'Disable' : 'Enable'}
-                                        </button>
-                                        <button type="button" className="danger" onClick={() => void deleteFolder(folder.id)}>
-                                            Remove
-                                        </button>
-                                    </div>
+                        <div className="stack">
+                            <strong>Configured folders</strong>
+
+                            {folders.length === 0 && !loading ? (
+                                <div className="small">No sync folders configured yet.</div>
+                            ) : (
+                                <div className="stack">
+                                    {folders.map((folder) => (
+                                        <article key={folder.id} className="card stack" style={{ padding: 12 }}>
+                                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                                <div className="stack" style={{ gap: 4 }}>
+                                                    <strong>{folder.folderPath}</strong>
+                                                    <div className="small">Storage: {folder.storageKey}</div>
+                                                    <div className="small">
+                                                        Last scanned:{' '}
+                                                        {folder.lastScannedAt ? new Date(folder.lastScannedAt).toLocaleString() : 'Never'}
+                                                    </div>
+                                                </div>
+
+                                                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void runFolderSync(folder)}
+                                                        disabled={syncing || !folder.enabled}
+                                                    >
+                                                        Sync this folder
+                                                    </button>
+                                                    <button type="button" className="secondary" onClick={() => void toggleFolder(folder)}>
+                                                        {folder.enabled ? 'Disable' : 'Enable'}
+                                                    </button>
+                                                    <button type="button" className="danger" onClick={() => void deleteFolder(folder.id)}>
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="small">
+                                                Status: {folder.enabled ? 'Enabled' : 'Disabled'}
+                                            </div>
+                                        </article>
+                                    ))}
                                 </div>
-
-                                <div className="small">
-                                    Status: {folder.enabled ? 'Enabled' : 'Disabled'}
-                                </div>
-                            </article>
-                        ))}
+                            )}
+                        </div>
                     </div>
-                )}
-            </div>
+                </>
+            )}
         </section>
     );
 }

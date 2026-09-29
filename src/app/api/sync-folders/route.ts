@@ -16,7 +16,7 @@ export async function GET() {
         where: { userId: user.id },
         orderBy: [
             { enabled: 'desc' },
-            { createdAt: 'asc' }
+            { folderPath: 'asc' }
         ]
     });
 
