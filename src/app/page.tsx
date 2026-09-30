@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { HomePage } from '@/components/home-page';
 import { LogoutButton } from '@/components/logout-button';
-import { IntegrationsPanel } from '@/components/integrations-panel';
-import { FilesystemSyncPanel } from '@/components/filesystem-sync-panel';
+import { SettingsShell } from '@/components/settings-shell';
 import { getCurrentUser } from '@/lib/auth';
 
 export default async function Page() {
@@ -27,11 +25,10 @@ export default async function Page() {
                     </div>
                 </nav>
             </header>
-            <main className="container stack">
-                <IntegrationsPanel />
-                <FilesystemSyncPanel />
+
+            <main className="container">
+                <SettingsShell />
             </main>
-            <HomePage />
         </>
     );
 }

@@ -55,6 +55,28 @@ async function walkDirectoryRecursive(absoluteDir: string): Promise<string[]> {
     return files;
 }
 
+async function walkDirectoriesRecursive(
+    absoluteDir: string,
+    storageRoot: string
+): Promise<string[]> {
+    const entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+    const directories: string[] = [];
+
+    for (const entry of entries) {
+        if (!entry.isDirectory()) {
+            continue;
+        }
+
+        const absoluteEntryPath = path.join(absoluteDir, entry.name);
+        const relativePath = path.relative(storageRoot, absoluteEntryPath).split(path.sep).join('/');
+
+        directories.push(relativePath);
+        directories.push(...await walkDirectoriesRecursive(absoluteEntryPath, storageRoot));
+    }
+
+    return directories;
+}
+
 async function sha256File(absolutePath: string) {
     const fileBuffer = await fs.readFile(absolutePath);
     return crypto.createHash('sha256').update(fileBuffer).digest('hex');
@@ -92,7 +114,8 @@ async function readExifCoordinates(absolutePath: string): Promise<ExifCoordinate
 }
 
 function normalizeFolderPath(folderPath: string) {
-    return folderPath.trim().replaceAll('\\', '/').replace(/^\/+|\/+$/g, '');
+    const normalized = folderPath.trim().replaceAll('\\', '/').replace(/^\/+|\/+$/g, '');
+    return normalized === '.' ? '' : normalized;
 }
 
 function toRelativeStoragePath(storageRoot: string, absoluteFilePath: string) {
@@ -104,9 +127,27 @@ function matchesFolderPrefix(filePath: string, folderPath: string) {
     const normalizedFilePath = filePath.replaceAll('\\', '/');
     const normalizedFolderPath = normalizeFolderPath(folderPath);
 
+    if (!normalizedFolderPath) {
+        return true;
+    }
+
     return (
         normalizedFilePath === normalizedFolderPath ||
         normalizedFilePath.startsWith(`${normalizedFolderPath}/`)
+    );
+}
+
+function isSameOrNestedFolder(folderPath: string, configuredFolderPath: string) {
+    const normalizedFolderPath = normalizeFolderPath(folderPath);
+    const normalizedConfiguredFolderPath = normalizeFolderPath(configuredFolderPath);
+
+    if (!normalizedConfiguredFolderPath) {
+        return true;
+    }
+
+    return (
+        normalizedFolderPath === normalizedConfiguredFolderPath ||
+        normalizedFolderPath.startsWith(`${normalizedConfiguredFolderPath}/`)
     );
 }
 
@@ -118,16 +159,11 @@ export async function validateSyncFolder(storageKey: string, folderPath: string)
         throw new Error('Storage key is required');
     }
 
-    if (!normalizedFolderPath) {
-        throw new Error('Folder path is required');
-    }
-
-    if (normalizedFolderPath.includes('..')) {
-        throw new Error('Folder path must stay inside the configured storage root');
-    }
-
     const storageRoot = getPhotoStorageRoot(trimmedStorageKey);
-    const absoluteFolderPath = path.join(storageRoot, normalizedFolderPath);
+    const absoluteFolderPath = normalizedFolderPath
+        ? path.join(storageRoot, normalizedFolderPath)
+        : storageRoot;
+
     const resolvedAbsoluteFolderPath = path.resolve(absoluteFolderPath);
     const resolvedStorageRoot = path.resolve(storageRoot);
 
@@ -153,6 +189,36 @@ export async function validateSyncFolder(storageKey: string, folderPath: string)
         storageKey: trimmedStorageKey,
         folderPath: normalizedFolderPath
     };
+}
+
+export async function listAvailableSyncDirectories(
+    storageKey: string,
+    excludedFolderPaths: string[] = []
+) {
+    const trimmedStorageKey = storageKey.trim();
+
+    if (!trimmedStorageKey) {
+        throw new Error('Storage key is required');
+    }
+
+    const storageRoot = getPhotoStorageRoot(trimmedStorageKey);
+    const directories = ['.', ...(await walkDirectoriesRecursive(storageRoot, storageRoot))];
+    const normalizedExcludedFolderPaths = excludedFolderPaths.map((folderPath) => normalizeFolderPath(folderPath));
+
+    return directories
+        .map((folderPath) => normalizeFolderPath(folderPath))
+        .filter((folderPath, index, items) => items.indexOf(folderPath) === index)
+        .filter(
+            (folderPath) =>
+                !normalizedExcludedFolderPaths.some((configuredFolderPath) =>
+                    isSameOrNestedFolder(folderPath, configuredFolderPath)
+                )
+        )
+        .sort((left, right) => {
+            if (left === '') return -1;
+            if (right === '') return 1;
+            return left.localeCompare(right);
+        });
 }
 
 export async function runFilesystemSync(
@@ -206,7 +272,9 @@ export async function runFilesystemSync(
         try {
             const storageRoot = getPhotoStorageRoot(folder.storageKey);
             const normalizedFolderPath = normalizeFolderPath(folder.folderPath);
-            const absoluteFolderPath = path.join(storageRoot, normalizedFolderPath);
+            const absoluteFolderPath = normalizedFolderPath
+                ? path.join(storageRoot, normalizedFolderPath)
+                : storageRoot;
 
             const stat = await fs.stat(absoluteFolderPath);
             if (!stat.isDirectory()) {
