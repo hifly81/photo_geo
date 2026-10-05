@@ -19,6 +19,7 @@ export type PhotoRecord = {
   city: string | null;
   placeName: string | null;
   caption: string | null;
+  favorite?: boolean;
   lastSeenAt?: string | null;
   missingFromDisk?: boolean;
   tags: PhotoTagItem[];

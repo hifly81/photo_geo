@@ -8,6 +8,7 @@ type PhotoFilters = {
   country?: string;
   city?: string;
   tag?: string;
+  tags?: string[];
 };
 
 type PhotoListMode =
@@ -21,22 +22,48 @@ type CountFilters = PhotoFilters & {
   locationCity?: string;
 };
 
-function buildBasePhotoWhere(userId: string, filters: PhotoFilters): Prisma.PhotoWhereInput {
-  return {
-    userId,
-    takenAt: filters.from || filters.to ? {
-      gte: filters.from ? new Date(filters.from) : undefined,
-      lte: filters.to ? new Date(filters.to) : undefined
-    } : undefined,
-    country: filters.country || undefined,
-    city: filters.city || undefined,
-    tags: filters.tag ? {
+function buildTagFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['tags'] | undefined {
+  const normalizedTags = (filters.tags ?? [])
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean);
+
+  if (normalizedTags.length > 0) {
+    return {
+      some: {
+        tag: {
+          name: {
+            in: normalizedTags
+          }
+        }
+      }
+    };
+  }
+
+  if (filters.tag) {
+    return {
       some: {
         tag: {
           name: filters.tag
         }
       }
-    } : undefined
+    };
+  }
+
+  return undefined;
+}
+
+function buildBasePhotoWhere(userId: string, filters: PhotoFilters): Prisma.PhotoWhereInput {
+  return {
+    userId,
+    takenAt: filters.from || filters.to
+        ? {
+          gte: filters.from ? new Date(filters.from) : undefined,
+          lte: filters.to ? new Date(filters.to) : undefined
+        }
+        : undefined,
+    country: filters.country || undefined,
+    city: filters.city || undefined,
+    tags: buildTagFilter(filters)
   };
 }
 
@@ -49,10 +76,7 @@ function buildPhotoWhere(userId: string, filters: PhotoFilters, mode: PhotoListM
   }
 
   if (mode === 'missing-geolocation') {
-    where.OR = [
-      { latitude: null },
-      { longitude: null }
-    ];
+    where.OR = [{ latitude: null }, { longitude: null }];
   }
 
   if (mode === 'missing-location-info') {
@@ -108,16 +132,14 @@ export async function listPhotosPaginated(
   };
 }
 
-export async function getPhotoCountsForTabs(
-    userId: string,
-    filters: CountFilters
-) {
+export async function getPhotoCountsForTabs(userId: string, filters: CountFilters) {
   const baseFilters: PhotoFilters = {
     from: filters.from,
     to: filters.to,
     country: filters.country,
     city: filters.city,
-    tag: filters.tag
+    tag: filters.tag,
+    tags: filters.tags
   };
 
   const byLocationFilters: PhotoFilters = {
@@ -125,16 +147,11 @@ export async function getPhotoCountsForTabs(
     to: filters.to,
     country: filters.locationCountry || '',
     city: filters.locationCity || '',
-    tag: filters.tag
+    tag: filters.tag,
+    tags: filters.tags
   };
 
-  const [
-    all,
-    withGeolocation,
-    missingGeolocation,
-    missingLocationInfo,
-    byLocation
-  ] = await Promise.all([
+  const [all, withGeolocation, missingGeolocation, missingLocationInfo, byLocation] = await Promise.all([
     prisma.photo.count({
       where: buildPhotoWhere(userId, baseFilters, 'all')
     }),
@@ -165,17 +182,13 @@ export async function getAvailableCountries(userId: string, filters: Omit<PhotoF
   const rows = await prisma.photo.findMany({
     where: {
       userId,
-      takenAt: filters.from || filters.to ? {
-        gte: filters.from ? new Date(filters.from) : undefined,
-        lte: filters.to ? new Date(filters.to) : undefined
-      } : undefined,
-      tags: filters.tag ? {
-        some: {
-          tag: {
-            name: filters.tag
+      takenAt: filters.from || filters.to
+          ? {
+            gte: filters.from ? new Date(filters.from) : undefined,
+            lte: filters.to ? new Date(filters.to) : undefined
           }
-        }
-      } : undefined,
+          : undefined,
+      tags: buildTagFilter(filters),
       country: {
         not: null
       }
@@ -189,9 +202,7 @@ export async function getAvailableCountries(userId: string, filters: Omit<PhotoF
     }
   });
 
-  return rows
-      .map((row) => row.country?.trim())
-      .filter((value): value is string => Boolean(value));
+  return rows.map((row) => row.country?.trim()).filter((value): value is string => Boolean(value));
 }
 
 export async function getAvailableCities(
@@ -205,18 +216,14 @@ export async function getAvailableCities(
   const rows = await prisma.photo.findMany({
     where: {
       userId,
-      takenAt: filters.from || filters.to ? {
-        gte: filters.from ? new Date(filters.from) : undefined,
-        lte: filters.to ? new Date(filters.to) : undefined
-      } : undefined,
-      country: filters.country,
-      tags: filters.tag ? {
-        some: {
-          tag: {
-            name: filters.tag
+      takenAt: filters.from || filters.to
+          ? {
+            gte: filters.from ? new Date(filters.from) : undefined,
+            lte: filters.to ? new Date(filters.to) : undefined
           }
-        }
-      } : undefined,
+          : undefined,
+      country: filters.country,
+      tags: buildTagFilter(filters),
       city: {
         not: null
       }
@@ -230,9 +237,7 @@ export async function getAvailableCities(
     }
   });
 
-  return rows
-      .map((row) => row.city?.trim())
-      .filter((value): value is string => Boolean(value));
+  return rows.map((row) => row.city?.trim()).filter((value): value is string => Boolean(value));
 }
 
 export async function getPhotoForUser(id: string, userId: string) {

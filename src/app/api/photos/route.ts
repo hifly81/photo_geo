@@ -35,6 +35,12 @@ export async function GET(request: NextRequest) {
   const modeParam = request.nextUrl.searchParams.get('mode') ?? 'all';
   const locationCountry = request.nextUrl.searchParams.get('locationCountry') ?? '';
   const locationCity = request.nextUrl.searchParams.get('locationCity') ?? '';
+  const tagsParam = request.nextUrl.searchParams.get('tags') ?? '';
+
+  const selectedTags = tagsParam
+      .split(',')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean);
 
   const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
   const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0
@@ -49,27 +55,34 @@ export async function GET(request: NextRequest) {
       locationCountry || locationCity
           ? {
             ...parseResult.data,
+            tags: selectedTags,
             country: locationCountry || undefined,
             city: locationCity || undefined
           }
-          : parseResult.data;
+          : {
+            ...parseResult.data,
+            tags: selectedTags
+          };
 
   const [result, counts, availableCountries, availableCities] = await Promise.all([
     listPhotosPaginated(user.id, effectiveFilters, { page, pageSize }, mode),
     getPhotoCountsForTabs(user.id, {
       ...parseResult.data,
+      tags: selectedTags,
       locationCountry,
       locationCity
     }),
     getAvailableCountries(user.id, {
       from: parseResult.data.from,
       to: parseResult.data.to,
-      tag: parseResult.data.tag
+      tag: parseResult.data.tag,
+      tags: selectedTags
     }),
     getAvailableCities(user.id, {
       from: parseResult.data.from,
       to: parseResult.data.to,
       tag: parseResult.data.tag,
+      tags: selectedTags,
       country: locationCountry || undefined
     })
   ]);
