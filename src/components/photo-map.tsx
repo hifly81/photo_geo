@@ -13,11 +13,11 @@ L.Icon.Default.mergeOptions({
 });
 
 export function PhotoMap({
-  photos,
-  selectedPhoto,
-  onSelectPhoto,
-  onPickLocation
-}: {
+                           photos,
+                           selectedPhoto,
+                           onSelectPhoto,
+                           onPickLocation
+                         }: {
   photos: PhotoRecord[];
   selectedPhoto: PhotoRecord | null;
   onSelectPhoto: (photo: PhotoRecord) => void;
@@ -27,6 +27,11 @@ export function PhotoMap({
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const selectedMarkerRef = useRef<L.Marker | null>(null);
+  const onPickLocationRef = useRef(onPickLocation);
+
+  useEffect(() => {
+    onPickLocationRef.current = onPickLocation;
+  }, [onPickLocation]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -39,48 +44,72 @@ export function PhotoMap({
 
     const markersLayer = L.layerGroup().addTo(map);
 
-    map.on('click', (event) => {
-      onPickLocation(event.latlng.lat, event.latlng.lng);
+    const handleClick = (event: L.LeafletMouseEvent) => {
+      onPickLocationRef.current(event.latlng.lat, event.latlng.lng);
+    };
+
+    map.on('click', handleClick);
+
+    const resizeObserver = new ResizeObserver(() => {
+      window.requestAnimationFrame(() => {
+        map.invalidateSize(true);
+      });
     });
+
+    resizeObserver.observe(containerRef.current);
 
     mapRef.current = map;
     markersLayerRef.current = markersLayer;
 
     return () => {
+      resizeObserver.disconnect();
+
+      if (selectedMarkerRef.current) {
+        map.removeLayer(selectedMarkerRef.current);
+        selectedMarkerRef.current = null;
+      }
+
       markersLayer.clearLayers();
-      map.off();
+      map.off('click', handleClick);
       map.remove();
       mapRef.current = null;
       markersLayerRef.current = null;
-      selectedMarkerRef.current = null;
     };
-  }, [onPickLocation]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
     const markersLayer = markersLayerRef.current;
+
     if (!map || !markersLayer) return;
 
     markersLayer.clearLayers();
 
+    if (selectedMarkerRef.current) {
+      map.removeLayer(selectedMarkerRef.current);
+      selectedMarkerRef.current = null;
+    }
+
     const geolocated = photos.filter(
-      (photo) => photo.latitude !== null && photo.longitude !== null
+        (photo) => photo.latitude !== null && photo.longitude !== null
     );
 
-    geolocated.forEach((photo) => {
+    for (const photo of geolocated) {
       const marker = L.marker([photo.latitude as number, photo.longitude as number]);
       marker.bindPopup(photo.originalFilename);
       marker.on('click', () => onSelectPhoto(photo));
       marker.addTo(markersLayer);
-    });
+    }
 
     if (selectedPhoto && selectedPhoto.latitude !== null && selectedPhoto.longitude !== null) {
       selectedMarkerRef.current = L.marker([selectedPhoto.latitude, selectedPhoto.longitude])
-        .bindPopup('Selected photo position')
-        .addTo(map);
-    } else {
-      selectedMarkerRef.current = null;
+          .bindPopup('Selected photo position')
+          .addTo(map);
     }
+
+    window.requestAnimationFrame(() => {
+      map.invalidateSize(true);
+    });
   }, [photos, selectedPhoto, onSelectPhoto]);
 
   return <div ref={containerRef} style={{ height: '100%', width: '100%' }} />;
