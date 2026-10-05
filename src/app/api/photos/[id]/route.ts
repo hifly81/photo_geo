@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getPhotoForUser, removeOrphanTags, mapPhotoForClient } from '@/lib/photos';
 import { updatePhotoSchema, bulkUpdatePhotosSchema } from '@/lib/validators';
 import { requireCurrentUser } from '@/lib/auth';
+import { markPhotoAsDeleted } from '@/lib/deleted-photos';
 
 export const runtime = 'nodejs';
 
@@ -94,6 +95,27 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.deletedPhoto.upsert({
+      where: {
+        userId_storageKey_filePath: {
+          userId: user.id,
+          storageKey: existing.storageKey,
+          filePath: existing.filePath
+        }
+      },
+      update: {
+        fileHash: existing.fileHash ?? undefined,
+        deletedAt: new Date()
+      },
+      create: {
+        userId: user.id,
+        storageKey: existing.storageKey,
+        filePath: existing.filePath,
+        fileHash: existing.fileHash ?? null,
+        deletedAt: new Date()
+      }
+    });
+
     await tx.photoTag.deleteMany({ where: { photoId: id } });
     await tx.photo.delete({ where: { id } });
   });

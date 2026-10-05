@@ -23,6 +23,19 @@ export type FilesystemSyncSummary = {
     }>;
 };
 
+export type DeletedPhotoBackfillSummary = {
+    scannedFolders: number;
+    scannedFiles: number;
+    createdDeletedPhotos: number;
+    alreadyTracked: number;
+    existingPhotos: number;
+    errors: Array<{
+        storageKey: string;
+        folderPath: string;
+        error: string;
+    }>;
+};
+
 type ExifCoordinates = {
     latitude: number | null;
     longitude: number | null;
@@ -221,6 +234,107 @@ export async function listAvailableSyncDirectories(
         });
 }
 
+export async function backfillDeletedPhotosFromFilesystem(userId: string): Promise<DeletedPhotoBackfillSummary> {
+    const folders = await prisma.syncFolder.findMany({
+        where: {
+            userId,
+            enabled: true
+        },
+        orderBy: {
+            createdAt: 'asc'
+        }
+    });
+
+    const summary: DeletedPhotoBackfillSummary = {
+        scannedFolders: 0,
+        scannedFiles: 0,
+        createdDeletedPhotos: 0,
+        alreadyTracked: 0,
+        existingPhotos: 0,
+        errors: []
+    };
+
+    for (const folder of folders) {
+        summary.scannedFolders += 1;
+
+        try {
+            const storageRoot = getPhotoStorageRoot(folder.storageKey);
+            const normalizedFolderPath = normalizeFolderPath(folder.folderPath);
+            const absoluteFolderPath = normalizedFolderPath
+                ? path.join(storageRoot, normalizedFolderPath)
+                : storageRoot;
+
+            const stat = await fs.stat(absoluteFolderPath);
+            if (!stat.isDirectory()) {
+                throw new Error('Configured path is not a directory');
+            }
+
+            const absoluteFiles = await walkDirectoryRecursive(absoluteFolderPath);
+
+            for (const absoluteFilePath of absoluteFiles) {
+                summary.scannedFiles += 1;
+
+                const relativePath = toRelativeStoragePath(storageRoot, absoluteFilePath);
+
+                const existingPhoto = await prisma.photo.findFirst({
+                    where: {
+                        userId,
+                        storageKey: folder.storageKey,
+                        filePath: relativePath
+                    },
+                    select: {
+                        id: true
+                    }
+                });
+
+                if (existingPhoto) {
+                    summary.existingPhotos += 1;
+                    continue;
+                }
+
+                const existingDeleted = await prisma.deletedPhoto.findUnique({
+                    where: {
+                        userId_storageKey_filePath: {
+                            userId,
+                            storageKey: folder.storageKey,
+                            filePath: relativePath
+                        }
+                    },
+                    select: {
+                        id: true
+                    }
+                });
+
+                if (existingDeleted) {
+                    summary.alreadyTracked += 1;
+                    continue;
+                }
+
+                const fileHash = await sha256File(absoluteFilePath);
+
+                await prisma.deletedPhoto.create({
+                    data: {
+                        userId,
+                        storageKey: folder.storageKey,
+                        filePath: relativePath,
+                        fileHash
+                    }
+                });
+
+                summary.createdDeletedPhotos += 1;
+            }
+        } catch (error) {
+            summary.errors.push({
+                storageKey: folder.storageKey,
+                folderPath: folder.folderPath,
+                error: error instanceof Error ? error.message : 'Unknown backfill error'
+            });
+        }
+    }
+
+    return summary;
+}
+
 export async function runFilesystemSync(
     userId: string,
     options: RunFilesystemSyncOptions = {}
@@ -287,6 +401,25 @@ export async function runFilesystemSync(
                 summary.scannedFiles += 1;
 
                 const relativePath = toRelativeStoragePath(storageRoot, absoluteFilePath);
+
+                const deletedPhoto = await prisma.deletedPhoto.findUnique({
+                    where: {
+                        userId_storageKey_filePath: {
+                            userId,
+                            storageKey: folder.storageKey,
+                            filePath: relativePath
+                        }
+                    },
+                    select: {
+                        id: true
+                    }
+                });
+
+                if (deletedPhoto) {
+                    summary.skipped += 1;
+                    continue;
+                }
+
                 const filename = path.basename(absoluteFilePath);
                 const fileHash = await sha256File(absoluteFilePath);
                 const exif = await readExifCoordinates(absoluteFilePath);

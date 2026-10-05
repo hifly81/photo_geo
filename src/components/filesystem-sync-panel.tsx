@@ -26,6 +26,19 @@ type SyncSummary = {
     }>;
 };
 
+type BackfillDeletedSummary = {
+    scannedFolders: number;
+    scannedFiles: number;
+    createdDeletedPhotos: number;
+    alreadyTracked: number;
+    existingPhotos: number;
+    errors: Array<{
+        storageKey: string;
+        folderPath: string;
+        error: string;
+    }>;
+};
+
 type DirectoryTreeResponse = {
     directories?: string[];
     error?: string;
@@ -151,6 +164,7 @@ export function FilesystemSyncPanel() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const [backfillingDeleted, setBackfillingDeleted] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -400,6 +414,42 @@ export function FilesystemSyncPanel() {
         }
     }
 
+    async function runDeletedBackfill() {
+        setBackfillingDeleted(true);
+        setError(null);
+        setMessage(null);
+
+        try {
+            const response = await fetch('/api/photos/fs-sync/backfill-deleted', {
+                method: 'POST'
+            });
+
+            const data = (await response.json()) as BackfillDeletedSummary & { error?: string; details?: string };
+
+            if (!response.ok) {
+                throw new Error(data.details ?? data.error ?? 'Deleted photos backfill failed');
+            }
+
+            const parts = [
+                `Folders scanned: ${data.scannedFolders}`,
+                `Files scanned: ${data.scannedFiles}`,
+                `DeletedPhoto created: ${data.createdDeletedPhotos}`,
+                `Already tracked: ${data.alreadyTracked}`,
+                `Existing Photo rows: ${data.existingPhotos}`
+            ];
+
+            if (data.errors.length > 0) {
+                parts.push(`Folder errors: ${data.errors.length}`);
+            }
+
+            setMessage(parts.join(' · '));
+        } catch (backfillError) {
+            setError(backfillError instanceof Error ? backfillError.message : 'Deleted photos backfill failed');
+        } finally {
+            setBackfillingDeleted(false);
+        }
+    }
+
     return (
         <section className="card stack">
             <div>
@@ -414,9 +464,25 @@ export function FilesystemSyncPanel() {
                     <span className="small">
                         {loading ? 'Loading…' : `${folders.length} folder(s), ${enabledCount} enabled`}
                     </span>
-                    <button type="button" onClick={() => void runSync()} disabled={syncing || enabledCount === 0}>
-                        {syncing ? 'Syncing…' : 'Run sync for all enabled folders'}
-                    </button>
+
+                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => void runDeletedBackfill()}
+                            disabled={backfillingDeleted || enabledCount === 0}
+                        >
+                            {backfillingDeleted ? 'Backfilling…' : 'Backfill deleted photos'}
+                        </button>
+
+                        <button type="button" onClick={() => void runSync()} disabled={syncing || enabledCount === 0}>
+                            {syncing ? 'Syncing…' : 'Run sync for all enabled folders'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="small">
+                    The deleted-photos backfill scans enabled folders and stores files that exist on disk but are not present in Photo.
                 </div>
 
                 <div className="small">
