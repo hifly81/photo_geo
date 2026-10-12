@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { PhotoRecord } from '@/types/photo';
 import type { PhotoSuggestions } from '@/types/photo-suggestions';
+import type { SelectedDateFilter } from '@/components/settings-shell';
 import { LocationAutocomplete, type GeocodeResult } from '@/components/location-autocomplete';
 
 const PhotoMap = dynamic(() => import('@/components/photo-map').then((mod) => mod.PhotoMap), {
@@ -29,12 +30,14 @@ type HomePageProps = {
   selectedTags?: string[];
   selectedPersonId?: string | null;
   selectedClusterKey?: string | null;
+  selectedDateFilter?: SelectedDateFilter;
 };
 
 export function HomePage({
                            selectedTags = [],
                            selectedPersonId = null,
-                           selectedClusterKey = null
+                           selectedClusterKey = null,
+                           selectedDateFilter = { mode: 'all' }
                          }: HomePageProps) {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
@@ -84,6 +87,19 @@ export function HomePage({
       params.set('tags', selectedTags.join(','));
     }
 
+    if (selectedDateFilter.mode === 'year') {
+      params.set('dateYear', selectedDateFilter.year);
+    }
+
+    if (selectedDateFilter.mode === 'month') {
+      params.set('dateYear', selectedDateFilter.year);
+      params.set('dateMonth', selectedDateFilter.month);
+    }
+
+    if (selectedDateFilter.mode === 'no-date') {
+      params.set('noDate', 'true');
+    }
+
     if (selectedPersonId) {
       params.set('personId', selectedPersonId);
     }
@@ -116,7 +132,11 @@ export function HomePage({
     photoListTab,
     selectedClusterKey,
     selectedPersonId,
-    selectedTags
+    selectedTags,
+    selectedDateFilter.mode,
+    selectedDateFilter.mode === 'year' ? selectedDateFilter.year : '',
+    selectedDateFilter.mode === 'month' ? selectedDateFilter.year : '',
+    selectedDateFilter.mode === 'month' ? selectedDateFilter.month : ''
   ]);
 
   const selectedPhotosCount = selectedPhotoIds.length;
@@ -202,6 +222,10 @@ export function HomePage({
   useEffect(() => {
     setSuggestions(null);
   }, [selectedPhoto?.id, isMultiSelection]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDateFilter]);
 
   function openEditor(photo?: PhotoRecord) {
     if (photo) {

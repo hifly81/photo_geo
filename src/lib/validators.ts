@@ -5,7 +5,16 @@ export const photoFiltersSchema = z.object({
   to: z.string().datetime().optional(),
   country: z.string().min(1).optional(),
   city: z.string().min(1).optional(),
-  tag: z.string().min(1).optional()
+  tag: z.string().min(1).optional(),
+  dateYear: z
+      .string()
+      .regex(/^\d{4}$/)
+      .optional(),
+  dateMonth: z
+      .string()
+      .regex(/^(0[1-9]|1[0-2])$/)
+      .optional(),
+  noDate: z.enum(['true', 'false']).optional()
 });
 
 export const updatePhotoSchema = z.object({

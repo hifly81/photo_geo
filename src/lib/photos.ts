@@ -9,6 +9,9 @@ type PhotoFilters = {
   city?: string;
   tag?: string;
   tags?: string[];
+  dateYear?: string;
+  dateMonth?: string;
+  noDate?: boolean;
 };
 
 type PhotoListMode =
@@ -20,6 +23,22 @@ type PhotoListMode =
 type CountFilters = PhotoFilters & {
   locationCountry?: string;
   locationCity?: string;
+};
+
+export type DateTreeMonth = {
+  month: string;
+  count: number;
+};
+
+export type DateTreeYear = {
+  year: string;
+  count: number;
+  months: DateTreeMonth[];
+};
+
+export type DateTree = {
+  years: DateTreeYear[];
+  noDateCount: number;
 };
 
 function buildTagFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['tags'] | undefined {
@@ -52,15 +71,48 @@ function buildTagFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['tags'] |
   return undefined;
 }
 
+function buildTakenAtFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['takenAt'] {
+  if (filters.noDate) {
+    return null;
+  }
+
+  if (filters.dateYear) {
+    const year = Number(filters.dateYear);
+    const month = filters.dateMonth ? Number(filters.dateMonth) : null;
+
+    if (month) {
+      const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+
+      return {
+        gte: start,
+        lt: end
+      };
+    }
+
+    const start = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0));
+
+    return {
+      gte: start,
+      lt: end
+    };
+  }
+
+  if (filters.from || filters.to) {
+    return {
+      gte: filters.from ? new Date(filters.from) : undefined,
+      lte: filters.to ? new Date(filters.to) : undefined
+    };
+  }
+
+  return undefined;
+}
+
 function buildBasePhotoWhere(userId: string, filters: PhotoFilters): Prisma.PhotoWhereInput {
   return {
     userId,
-    takenAt: filters.from || filters.to
-        ? {
-          gte: filters.from ? new Date(filters.from) : undefined,
-          lte: filters.to ? new Date(filters.to) : undefined
-        }
-        : undefined,
+    takenAt: buildTakenAtFilter(filters),
     country: filters.country || undefined,
     city: filters.city || undefined,
     tags: buildTagFilter(filters)
@@ -139,7 +191,10 @@ export async function getPhotoCountsForTabs(userId: string, filters: CountFilter
     country: filters.country,
     city: filters.city,
     tag: filters.tag,
-    tags: filters.tags
+    tags: filters.tags,
+    dateYear: filters.dateYear,
+    dateMonth: filters.dateMonth,
+    noDate: filters.noDate
   };
 
   const byLocationFilters: PhotoFilters = {
@@ -148,7 +203,10 @@ export async function getPhotoCountsForTabs(userId: string, filters: CountFilter
     country: filters.locationCountry || '',
     city: filters.locationCity || '',
     tag: filters.tag,
-    tags: filters.tags
+    tags: filters.tags,
+    dateYear: filters.dateYear,
+    dateMonth: filters.dateMonth,
+    noDate: filters.noDate
   };
 
   const [all, withGeolocation, missingGeolocation, missingLocationInfo, byLocation] = await Promise.all([
@@ -182,12 +240,7 @@ export async function getAvailableCountries(userId: string, filters: Omit<PhotoF
   const rows = await prisma.photo.findMany({
     where: {
       userId,
-      takenAt: filters.from || filters.to
-          ? {
-            gte: filters.from ? new Date(filters.from) : undefined,
-            lte: filters.to ? new Date(filters.to) : undefined
-          }
-          : undefined,
+      takenAt: buildTakenAtFilter(filters),
       tags: buildTagFilter(filters),
       country: {
         not: null
@@ -216,12 +269,7 @@ export async function getAvailableCities(
   const rows = await prisma.photo.findMany({
     where: {
       userId,
-      takenAt: filters.from || filters.to
-          ? {
-            gte: filters.from ? new Date(filters.from) : undefined,
-            lte: filters.to ? new Date(filters.to) : undefined
-          }
-          : undefined,
+      takenAt: buildTakenAtFilter(filters),
       country: filters.country,
       tags: buildTagFilter(filters),
       city: {
@@ -238,6 +286,66 @@ export async function getAvailableCities(
   });
 
   return rows.map((row) => row.city?.trim()).filter((value): value is string => Boolean(value));
+}
+
+export async function getAvailableDateTree(
+    userId: string,
+    filters: Omit<PhotoFilters, 'dateYear' | 'dateMonth' | 'noDate'>
+): Promise<DateTree> {
+  const rows = await prisma.photo.findMany({
+    where: {
+      userId,
+      country: filters.country || undefined,
+      city: filters.city || undefined,
+      tags: buildTagFilter(filters)
+    },
+    select: {
+      takenAt: true
+    }
+  });
+
+  const yearMap = new Map<string, Map<string, number>>();
+  let noDateCount = 0;
+
+  for (const row of rows) {
+    if (!row.takenAt) {
+      noDateCount += 1;
+      continue;
+    }
+
+    const date = new Date(row.takenAt);
+    const year = String(date.getUTCFullYear());
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+
+    if (!yearMap.has(year)) {
+      yearMap.set(year, new Map<string, number>());
+    }
+
+    const monthMap = yearMap.get(year)!;
+    monthMap.set(month, (monthMap.get(month) ?? 0) + 1);
+  }
+
+  const years = Array.from(yearMap.entries())
+      .sort((a, b) => Number(b[0]) - Number(a[0]))
+      .map(([year, monthsMap]) => {
+        const months = Array.from(monthsMap.entries())
+            .sort((a, b) => Number(a[0]) - Number(b[0]))
+            .map(([month, count]) => ({
+              month,
+              count
+            }));
+
+        return {
+          year,
+          count: months.reduce((sum, item) => sum + item.count, 0),
+          months
+        };
+      });
+
+  return {
+    years,
+    noDateCount
+  };
 }
 
 export async function getPhotoForUser(id: string, userId: string) {

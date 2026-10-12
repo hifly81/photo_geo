@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
   const locationCountry = request.nextUrl.searchParams.get('locationCountry') ?? '';
   const locationCity = request.nextUrl.searchParams.get('locationCity') ?? '';
   const tagsParam = request.nextUrl.searchParams.get('tags') ?? '';
+  const dateYear = request.nextUrl.searchParams.get('dateYear') ?? '';
+  const dateMonth = request.nextUrl.searchParams.get('dateMonth') ?? '';
+  const noDate = request.nextUrl.searchParams.get('noDate') ?? '';
 
   const selectedTags = tagsParam
       .split(',')
@@ -56,12 +59,18 @@ export async function GET(request: NextRequest) {
           ? {
             ...parseResult.data,
             tags: selectedTags,
+            dateYear: dateYear || undefined,
+            dateMonth: dateMonth || undefined,
+            noDate: noDate === 'true',
             country: locationCountry || undefined,
             city: locationCity || undefined
           }
           : {
             ...parseResult.data,
-            tags: selectedTags
+            tags: selectedTags,
+            dateYear: dateYear || undefined,
+            dateMonth: dateMonth || undefined,
+            noDate: noDate === 'true'
           };
 
   const [result, counts, availableCountries, availableCities] = await Promise.all([
@@ -69,6 +78,9 @@ export async function GET(request: NextRequest) {
     getPhotoCountsForTabs(user.id, {
       ...parseResult.data,
       tags: selectedTags,
+      dateYear: dateYear || undefined,
+      dateMonth: dateMonth || undefined,
+      noDate: noDate === 'true',
       locationCountry,
       locationCity
     }),
@@ -76,13 +88,19 @@ export async function GET(request: NextRequest) {
       from: parseResult.data.from,
       to: parseResult.data.to,
       tag: parseResult.data.tag,
-      tags: selectedTags
+      tags: selectedTags,
+      dateYear: dateYear || undefined,
+      dateMonth: dateMonth || undefined,
+      noDate: noDate === 'true'
     }),
     getAvailableCities(user.id, {
       from: parseResult.data.from,
       to: parseResult.data.to,
       tag: parseResult.data.tag,
       tags: selectedTags,
+      dateYear: dateYear || undefined,
+      dateMonth: dateMonth || undefined,
+      noDate: noDate === 'true',
       country: locationCountry || undefined
     })
   ]);

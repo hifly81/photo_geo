@@ -12,11 +12,36 @@ type TagOption = {
     name: string;
 };
 
+type DateTreeMonth = {
+    month: string;
+    count: number;
+};
+
+type DateTreeYear = {
+    year: string;
+    count: number;
+    months: DateTreeMonth[];
+};
+
+type DateTreeResponse = {
+    years: DateTreeYear[];
+    noDateCount: number;
+};
+
+export type SelectedDateFilter =
+    | { mode: 'all' }
+    | { mode: 'year'; year: string }
+    | { mode: 'month'; year: string; month: string }
+    | { mode: 'no-date' };
+
 export function SettingsShell() {
     const [activeSection, setActiveSection] = useState<SettingsSection>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [dateTree, setDateTree] = useState<DateTreeResponse>({ years: [], noDateCount: 0 });
+    const [expandedYears, setExpandedYears] = useState<string[]>([]);
+    const [selectedDateFilter, setSelectedDateFilter] = useState<SelectedDateFilter>({ mode: 'all' });
 
     useEffect(() => {
         async function loadTags() {
@@ -37,6 +62,35 @@ export function SettingsShell() {
         void loadTags();
     }, []);
 
+    useEffect(() => {
+        async function loadDates() {
+            try {
+                const params = new URLSearchParams();
+
+                if (selectedTags.length > 0) {
+                    params.set('tags', selectedTags.join(','));
+                }
+
+                const query = params.toString();
+                const response = await fetch(query ? `/api/dates?${query}` : '/api/dates');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error ?? 'Failed to load dates');
+                }
+
+                setDateTree({
+                    years: data.years ?? [],
+                    noDateCount: data.noDateCount ?? 0
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        void loadDates();
+    }, [selectedTags]);
+
     function toggleTag(tagName: string) {
         setSelectedTags((current) =>
             current.includes(tagName)
@@ -50,6 +104,71 @@ export function SettingsShell() {
         setSelectedTags([]);
         setActiveSection('home');
     }
+
+    function toggleYearExpanded(year: string) {
+        setExpandedYears((current) =>
+            current.includes(year)
+                ? current.filter((item) => item !== year)
+                : [...current, year]
+        );
+    }
+
+    function selectAllDates() {
+        setSelectedDateFilter({ mode: 'all' });
+        setActiveSection('home');
+    }
+
+    function selectYear(year: string) {
+        setSelectedDateFilter({ mode: 'year', year });
+        setActiveSection('home');
+    }
+
+    function selectMonth(year: string, month: string) {
+        setSelectedDateFilter({ mode: 'month', year, month });
+        setActiveSection('home');
+    }
+
+    function selectNoDate() {
+        setSelectedDateFilter({ mode: 'no-date' });
+        setActiveSection('home');
+    }
+
+    function isYearSelected(year: string) {
+        return selectedDateFilter.mode === 'year' && selectedDateFilter.year === year;
+    }
+
+    function isMonthSelected(year: string, month: string) {
+        return (
+            selectedDateFilter.mode === 'month' &&
+            selectedDateFilter.year === year &&
+            selectedDateFilter.month === month
+        );
+    }
+
+    function formatMonth(month: string) {
+        const names: Record<string, string> = {
+            '01': 'January',
+            '02': 'February',
+            '03': 'March',
+            '04': 'April',
+            '05': 'May',
+            '06': 'June',
+            '07': 'July',
+            '08': 'August',
+            '09': 'September',
+            '10': 'October',
+            '11': 'November',
+            '12': 'December'
+        };
+
+        return names[month] ?? month;
+    }
+
+    const countTextStyle = {
+        flexShrink: 0,
+        color: '#1f2937',
+        fontWeight: 600
+    } as const;
 
     return (
         <section
@@ -68,7 +187,9 @@ export function SettingsShell() {
                     flexDirection: 'column',
                     gap: 12,
                     position: 'sticky',
-                    top: 16
+                    top: 16,
+                    maxHeight: 'calc(100vh - 32px)',
+                    overflowY: 'auto'
                 }}
             >
                 <div
@@ -182,12 +303,173 @@ export function SettingsShell() {
                                 </button>
                             );
                         })}
+
+                        <div style={{ height: 8 }} />
+                        <strong>Date</strong>
+
+                        <button
+                            type="button"
+                            className={selectedDateFilter.mode === 'all' ? '' : 'secondary'}
+                            onClick={selectAllDates}
+                            style={{
+                                textAlign: 'left',
+                                justifyContent: 'flex-start',
+                                width: '100%',
+                                padding: '8px 10px',
+                                fontSize: 14
+                            }}
+                        >
+                            All dates
+                        </button>
+
+                        {dateTree.years.map((item) => {
+                            const expanded = expandedYears.includes(item.year);
+                            const selected = isYearSelected(item.year);
+
+                            return (
+                                <div key={item.year} className="stack" style={{ gap: 4 }}>
+                                    <div
+                                        style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '28px minmax(0, 1fr)',
+                                            gap: 6,
+                                            alignItems: 'stretch'
+                                        }}
+                                    >
+                                        <button
+                                            type="button"
+                                            className="secondary"
+                                            onClick={() => toggleYearExpanded(item.year)}
+                                            aria-label={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
+                                            title={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
+                                            style={{
+                                                padding: 0,
+                                                minWidth: 28,
+                                                width: 28,
+                                                height: 36,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                                lineHeight: 1
+                                            }}
+                                        >
+                                            {expanded ? '−' : '+'}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className={selected ? '' : 'secondary'}
+                                            onClick={() => selectYear(item.year)}
+                                            style={{
+                                                textAlign: 'left',
+                                                justifyContent: 'space-between',
+                                                width: '100%',
+                                                padding: '8px 10px',
+                                                fontSize: 14,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8
+                                            }}
+                                            title={item.year}
+                                        >
+                      <span
+                          style={{
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                          }}
+                      >
+                        {selected ? '✓ ' : ''}
+                          {item.year}
+                      </span>
+                                            <span className="small" style={countTextStyle}>
+                        {item.count}
+                      </span>
+                                        </button>
+                                    </div>
+
+                                    {expanded ? (
+                                        <div className="stack" style={{ gap: 4, paddingLeft: 34 }}>
+                                            {item.months.map((month) => {
+                                                const monthSelected = isMonthSelected(item.year, month.month);
+
+                                                return (
+                                                    <button
+                                                        key={`${item.year}-${month.month}`}
+                                                        type="button"
+                                                        className={monthSelected ? '' : 'secondary'}
+                                                        onClick={() => selectMonth(item.year, month.month)}
+                                                        style={{
+                                                            textAlign: 'left',
+                                                            justifyContent: 'space-between',
+                                                            width: '100%',
+                                                            padding: '8px 10px',
+                                                            fontSize: 14,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 8
+                                                        }}
+                                                        title={`${item.year}-${month.month}`}
+                                                    >
+                            <span
+                                style={{
+                                    minWidth: 0,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                              {monthSelected ? '✓ ' : ''}
+                                {formatMonth(month.month)}
+                            </span>
+                                                        <span className="small" style={countTextStyle}>
+                              {month.count}
+                            </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            );
+                        })}
+
+                        <button
+                            type="button"
+                            className={selectedDateFilter.mode === 'no-date' ? '' : 'secondary'}
+                            onClick={selectNoDate}
+                            style={{
+                                textAlign: 'left',
+                                justifyContent: 'space-between',
+                                width: '100%',
+                                padding: '8px 10px',
+                                fontSize: 14,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}
+                        >
+              <span>
+                {selectedDateFilter.mode === 'no-date' ? '✓ ' : ''}
+                  No date
+              </span>
+                            <span className="small" style={countTextStyle}>
+                {dateTree.noDateCount}
+              </span>
+                        </button>
                     </div>
                 ) : null}
             </aside>
 
             <div style={{ minWidth: 0 }}>
-                {activeSection === 'home' ? <HomePage selectedTags={selectedTags} /> : null}
+                {activeSection === 'home' ? (
+                    <HomePage
+                        selectedTags={selectedTags}
+                        selectedDateFilter={selectedDateFilter}
+                    />
+                ) : null}
                 {activeSection === 'providers' ? <IntegrationsPanel /> : null}
                 {activeSection === 'filesystem-sync' ? <FilesystemSyncPanel /> : null}
             </div>
