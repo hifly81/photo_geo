@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { PhotoRecord } from '@/types/photo';
+import type { PhotoSuggestions } from '@/types/photo-suggestions';
 import { LocationAutocomplete, type GeocodeResult } from '@/components/location-autocomplete';
 
 const PhotoMap = dynamic(() => import('@/components/photo-map').then((mod) => mod.PhotoMap), {
@@ -26,9 +27,15 @@ type PhotoListTab = 'all' | 'with-geolocation' | 'missing-geolocation' | 'missin
 
 type HomePageProps = {
   selectedTags?: string[];
+  selectedPersonId?: string | null;
+  selectedClusterKey?: string | null;
 };
 
-export function HomePage({ selectedTags = [] }: HomePageProps) {
+export function HomePage({
+                           selectedTags = [],
+                           selectedPersonId = null,
+                           selectedClusterKey = null
+                         }: HomePageProps) {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
@@ -49,6 +56,8 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
   const [isMapOpen, setIsMapOpen] = useState(true);
   const [mapHeight, setMapHeight] = useState(720);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<PhotoSuggestions | null>(null);
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [counts, setCounts] = useState({
     all: 0,
     withGeolocation: 0,
@@ -75,6 +84,14 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
       params.set('tags', selectedTags.join(','));
     }
 
+    if (selectedPersonId) {
+      params.set('personId', selectedPersonId);
+    }
+
+    if (selectedClusterKey) {
+      params.set('clusterKey', selectedClusterKey);
+    }
+
     params.set('page', String(currentPage));
     params.set('pageSize', String(photosPerPage));
     params.set('locationCountry', locationCountry);
@@ -91,7 +108,16 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
     }
 
     return params.toString();
-  }, [currentPage, filters, locationCity, locationCountry, photoListTab, selectedTags]);
+  }, [
+    currentPage,
+    filters,
+    locationCity,
+    locationCountry,
+    photoListTab,
+    selectedClusterKey,
+    selectedPersonId,
+    selectedTags
+  ]);
 
   const selectedPhotosCount = selectedPhotoIds.length;
   const isMultiSelection = selectedPhotosCount > 1;
@@ -136,12 +162,24 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [photoListTab, filters.from, filters.to, filters.country, filters.city, locationCountry, locationCity, selectedTags]);
+  }, [
+    photoListTab,
+    filters.from,
+    filters.to,
+    filters.country,
+    filters.city,
+    locationCountry,
+    locationCity,
+    selectedTags,
+    selectedPersonId,
+    selectedClusterKey
+  ]);
 
   useEffect(() => {
     if (selectedPhoto && !photos.some((photo) => photo.id === selectedPhoto.id)) {
       setSelectedPhoto(null);
       setIsEditorOpen(false);
+      setSuggestions(null);
     }
   }, [photos, selectedPhoto]);
 
@@ -161,6 +199,10 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
     setPlaceQuery(selectedPhoto?.placeName ?? selectedPhoto?.city ?? '');
   }, [selectedPhoto?.id, selectedPhoto?.placeName, selectedPhoto?.city]);
 
+  useEffect(() => {
+    setSuggestions(null);
+  }, [selectedPhoto?.id, isMultiSelection]);
+
   function openEditor(photo?: PhotoRecord) {
     if (photo) {
       setSelectedPhoto(photo);
@@ -177,6 +219,177 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
   function closeEditor() {
     setIsEditorOpen(false);
     setTagName('');
+    setSuggestions(null);
+  }
+
+  async function analyzeSelectedPhoto() {
+    if (!selectedPhoto || isMultiSelection) return;
+
+    setError(null);
+    setSuccessMessage(null);
+    setSuggestions(null);
+    setIsAnalyzingPhoto(true);
+
+    try {
+      const response = await fetch(`/api/photos/${selectedPhoto.id}/suggestions`, {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Failed to analyze photo');
+      }
+
+      setSuggestions(data.suggestions ?? {});
+    } catch (analysisError) {
+      setError(analysisError instanceof Error ? analysisError.message : 'Failed to analyze photo');
+    } finally {
+      setIsAnalyzingPhoto(false);
+    }
+  }
+
+  function applySuggestionField(field: keyof PhotoSuggestions) {
+    if (!selectedPhoto || !suggestions) return;
+
+    if (field === 'tags') {
+      const nextTags = suggestions.tags ?? [];
+      if (nextTags.length === 0) return;
+
+      const existingTagNames = new Set(selectedPhoto.tags.map(({ tag }) => tag.name.toLowerCase()));
+      const newTagItems = nextTags
+          .filter((name) => !existingTagNames.has(name.toLowerCase()))
+          .map((name, index) => ({
+            tag: {
+              id: `suggested-${index}-${name}`,
+              name
+            }
+          }));
+
+      setSelectedPhoto({
+        ...selectedPhoto,
+        tags: [...selectedPhoto.tags, ...newTagItems]
+      });
+
+      setSuggestions((current) => {
+        if (!current) return current;
+        const next = { ...current };
+        delete next.tags;
+        return next;
+      });
+
+      return;
+    }
+
+    const value = suggestions[field];
+    if (value == null) return;
+
+    const nextPhoto: PhotoRecord = { ...selectedPhoto };
+
+    if (field === 'caption' && typeof value === 'string') {
+      nextPhoto.caption = value;
+    }
+
+    if (field === 'takenAt' && typeof value === 'string') {
+      nextPhoto.takenAt = value;
+    }
+
+    if (field === 'latitude' && typeof value === 'number') {
+      nextPhoto.latitude = value;
+    }
+
+    if (field === 'longitude' && typeof value === 'number') {
+      nextPhoto.longitude = value;
+    }
+
+    if (field === 'country' && typeof value === 'string') {
+      nextPhoto.country = value;
+    }
+
+    if (field === 'placeName' && typeof value === 'string') {
+      nextPhoto.placeName = value;
+      setPlaceQuery(value);
+    }
+
+    if (field === 'city' && typeof value === 'string') {
+      nextPhoto.city = value;
+    }
+
+    setSelectedPhoto(nextPhoto);
+
+    setSuggestions((current) => {
+      if (!current) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function applyAllSuggestions() {
+    if (!selectedPhoto || !suggestions) return;
+
+    let nextPhoto: PhotoRecord = { ...selectedPhoto };
+
+    if (typeof suggestions.caption === 'string') {
+      nextPhoto.caption = suggestions.caption;
+    }
+
+    if (typeof suggestions.takenAt === 'string') {
+      nextPhoto.takenAt = suggestions.takenAt;
+    }
+
+    if (typeof suggestions.latitude === 'number') {
+      nextPhoto.latitude = suggestions.latitude;
+    }
+
+    if (typeof suggestions.longitude === 'number') {
+      nextPhoto.longitude = suggestions.longitude;
+    }
+
+    if (typeof suggestions.country === 'string') {
+      nextPhoto.country = suggestions.country;
+    }
+
+    if (typeof suggestions.placeName === 'string') {
+      nextPhoto.placeName = suggestions.placeName;
+      setPlaceQuery(suggestions.placeName);
+    }
+
+    if (typeof suggestions.city === 'string') {
+      nextPhoto.city = suggestions.city;
+    }
+
+    if (Array.isArray(suggestions.tags) && suggestions.tags.length > 0) {
+      const existingTagNames = new Set(nextPhoto.tags.map(({ tag }) => tag.name.toLowerCase()));
+      const newTagItems = suggestions.tags
+          .filter((name) => !existingTagNames.has(name.toLowerCase()))
+          .map((name, index) => ({
+            tag: {
+              id: `suggested-${index}-${name}`,
+              name
+            }
+          }));
+
+      nextPhoto.tags = [...nextPhoto.tags, ...newTagItems];
+    }
+
+    setSelectedPhoto(nextPhoto);
+    setSuggestions({});
+  }
+
+  function hasSuggestions(currentSuggestions: PhotoSuggestions | null) {
+    if (!currentSuggestions) return false;
+
+    return Boolean(
+        currentSuggestions.caption ||
+        currentSuggestions.takenAt ||
+        typeof currentSuggestions.latitude === 'number' ||
+        typeof currentSuggestions.longitude === 'number' ||
+        currentSuggestions.country ||
+        currentSuggestions.placeName ||
+        currentSuggestions.city ||
+        (currentSuggestions.tags && currentSuggestions.tags.length > 0)
+    );
   }
 
   async function savePhoto() {
@@ -264,6 +477,7 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
     setSelectedPhotoIds((current) => current.filter((id) => id !== photoToDelete.id));
     setSuccessMessage('Photo deleted successfully.');
     setIsEditorOpen(false);
+    setSuggestions(null);
     await loadPhotos();
   }
 
@@ -286,6 +500,37 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
 
     setTagName('');
     setSuccessMessage('Tag added successfully.');
+    await loadPhotos();
+  }
+
+  async function addSuggestedTags(tags: string[]) {
+    if (!selectedPhoto || tags.length === 0 || isMultiSelection) return;
+
+    setError(null);
+    setSuccessMessage(null);
+
+    for (const suggestedTag of tags) {
+      const response = await fetch(`/api/photos/${selectedPhoto.id}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagName: suggestedTag })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error ?? `Could not add suggested tag: ${suggestedTag}`);
+        return;
+      }
+    }
+
+    setSuggestions((current) => {
+      if (!current) return current;
+      const next = { ...current };
+      delete next.tags;
+      return next;
+    });
+
+    setSuccessMessage('Suggested tags added successfully.');
     await loadPhotos();
   }
 
@@ -512,6 +757,9 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
                 <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="small">
                   Active tags: {selectedTags.length > 0 ? selectedTags.join(', ') : 'none'}
+                </span>
+                  <span className="small">
+                  Person filter: {selectedPersonId ? 'named person' : selectedClusterKey ? 'unnamed cluster' : 'none'}
                 </span>
                   <span className="small">Selected: {selectedPhotosCount}</span>
                   <button
@@ -775,6 +1023,16 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
                   <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <h2 style={{ margin: 0 }}>{isMultiSelection ? `Edit selection (${selectedPhotosCount})` : 'Edit photo'}</h2>
                     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      {!isMultiSelection ? (
+                          <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => void analyzeSelectedPhoto()}
+                              disabled={isAnalyzingPhoto}
+                          >
+                            {isAnalyzingPhoto ? 'Analyzing…' : 'Analyze photo'}
+                          </button>
+                      ) : null}
                       <button type="button" className="secondary" onClick={openOriginalImage}>
                         Open original
                       </button>
@@ -823,6 +1081,128 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
 
                   <div className="small">{selectedPhoto.originalFilename}</div>
                   {isMultiSelection && <div className="small">Multi-selection active. Changes to location apply to all selected photos.</div>}
+
+                  {!isMultiSelection && hasSuggestions(suggestions) ? (
+                      <div className="card stack" style={{ gap: 12, padding: 12, background: '#ecfdf3', border: '1px solid #abefc6' }}>
+                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0 }}>Suggestions</h3>
+                          <button type="button" className="secondary" onClick={applyAllSuggestions}>
+                            Apply all
+                          </button>
+                        </div>
+
+                        {suggestions.caption ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Caption</strong>
+                                <div className="small">{suggestions.caption}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('caption')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {suggestions.takenAt ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Taken at</strong>
+                                <div className="small">{new Date(suggestions.takenAt).toLocaleString()}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('takenAt')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {typeof suggestions.latitude === 'number' ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Latitude</strong>
+                                <div className="small">{suggestions.latitude}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('latitude')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {typeof suggestions.longitude === 'number' ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Longitude</strong>
+                                <div className="small">{suggestions.longitude}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('longitude')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {suggestions.country ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Country</strong>
+                                <div className="small">{suggestions.country}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('country')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {suggestions.placeName ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>Place</strong>
+                                <div className="small">{suggestions.placeName}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('placeName')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {suggestions.city ? (
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                              <div className="stack" style={{ gap: 4 }}>
+                                <strong>City</strong>
+                                <div className="small">{suggestions.city}</div>
+                              </div>
+                              <button type="button" className="secondary" onClick={() => applySuggestionField('city')}>
+                                Apply
+                              </button>
+                            </div>
+                        ) : null}
+
+                        {Array.isArray(suggestions.tags) && suggestions.tags.length > 0 ? (
+                            <div className="stack" style={{ gap: 8 }}>
+                              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                                <div className="stack" style={{ gap: 4 }}>
+                                  <strong>Tags</strong>
+                                  <div className="tag-list">
+                                    {suggestions.tags.map((tag) => (
+                                        <span key={tag} className="tag">{tag}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="row" style={{ gap: 8 }}>
+                                  <button type="button" className="secondary" onClick={() => applySuggestionField('tags')}>
+                                    Apply to form
+                                  </button>
+                                  <button type="button" className="secondary" onClick={() => void addSuggestedTags(suggestions.tags ?? [])}>
+                                    Add tags
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                        ) : null}
+                      </div>
+                  ) : null}
+
+                  {!isMultiSelection && suggestions && !hasSuggestions(suggestions) && !isAnalyzingPhoto ? (
+                      <div className="small">No missing fields could be suggested for this photo.</div>
+                  ) : null}
 
                   <label>
                     Caption
@@ -951,7 +1331,7 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
                       {selectedPhoto.tags.map(({ tag }) => (
                           <span key={tag.id} className="tag">
                       {tag.name}
-                            <button type="button" className="danger small-button" onClick={() => removeTag(tag.name)}>
+                            <button type="button" className="danger small-button" onClick={() => void removeTag(tag.name)}>
                         x
                       </button>
                     </span>
@@ -959,7 +1339,7 @@ export function HomePage({ selectedTags = [] }: HomePageProps) {
                     </div>
                     <div className="row">
                       <input value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="e.g. panorama" />
-                      <button type="button" onClick={addTag} disabled={isMultiSelection}>
+                      <button type="button" onClick={() => void addTag()} disabled={isMultiSelection}>
                         Add tag
                       </button>
                     </div>

@@ -94,22 +94,53 @@ export function PhotoMap({
         (photo) => photo.latitude !== null && photo.longitude !== null
     );
 
+    const latLngs: L.LatLngExpression[] = [];
+
     for (const photo of geolocated) {
-      const marker = L.marker([photo.latitude as number, photo.longitude as number]);
+      const latLng: L.LatLngExpression = [photo.latitude as number, photo.longitude as number];
+      latLngs.push(latLng);
+
+      const marker = L.marker(latLng);
       marker.bindPopup(photo.originalFilename);
       marker.on('click', () => onSelectPhoto(photo));
       marker.addTo(markersLayer);
     }
 
     if (selectedPhoto && selectedPhoto.latitude !== null && selectedPhoto.longitude !== null) {
-      selectedMarkerRef.current = L.marker([selectedPhoto.latitude, selectedPhoto.longitude])
+      const selectedLatLng: L.LatLngExpression = [
+        selectedPhoto.latitude,
+        selectedPhoto.longitude
+      ];
+
+      selectedMarkerRef.current = L.marker(selectedLatLng)
           .bindPopup('Selected photo position')
           .addTo(map);
+
+      window.requestAnimationFrame(() => {
+        map.invalidateSize(true);
+        map.setView(selectedLatLng, Math.max(map.getZoom(), 10), { animate: false });
+      });
+
+      return;
     }
 
-    window.requestAnimationFrame(() => {
-      map.invalidateSize(true);
-    });
+    if (latLngs.length === 1) {
+      window.requestAnimationFrame(() => {
+        map.invalidateSize(true);
+        map.setView(latLngs[0], 10, { animate: false });
+      });
+
+      return;
+    }
+
+    if (latLngs.length > 1) {
+      const bounds = L.latLngBounds(latLngs);
+
+      window.requestAnimationFrame(() => {
+        map.invalidateSize(true);
+        map.fitBounds(bounds, { padding: [24, 24], animate: false });
+      });
+    }
   }, [photos, selectedPhoto, onSelectPhoto]);
 
   return <div ref={containerRef} style={{ height: '100%', width: '100%' }} />;

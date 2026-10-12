@@ -1,10 +1,10 @@
 # Photo Geo
 
-Photo Geo is a web app to organize, browse, and edit photos using a map-based workflow.
+Photo Geo is an app to organize, browse, and edit photos using a map-based workflow.
 
 It lets you:
 
-- upload photos from the browser
+- upload and synchronize photos
 - catalog photos that already exist on your filesystem
 - browse your collection on a map
 - edit metadata and coordinates
@@ -99,47 +99,6 @@ Photo Geo does not need to move or duplicate filesystem-synced files.
 
 ---
 
-## Screenshots
-
-Store screenshots in:
-
-```text
-docs/screenshots/
-```
-
-Recommended structure:
-
-```text
-docs/
-  screenshots/
-    home-overview.png
-    photo-edit-panel.png
-    filesystem-sync-panel.png
-    providers-panel.png
-    by-location-tab.png
-```
-
-### Home
-
-![Home overview](docs/screenshots/home-overview.png)
-
-### Edit panel
-
-![Edit panel](docs/screenshots/photo-edit-panel.png)
-
-### Filesystem sync
-
-![Filesystem sync panel](docs/screenshots/filesystem-sync-panel.png)
-
-### Providers
-
-![Providers panel](docs/screenshots/providers-panel.png)
-
-### By location
-
-![By location tab](docs/screenshots/by-location-tab.png)
-
----
 
 ## Requirements
 
@@ -159,7 +118,7 @@ Supported image formats:
 
 ---
 
-## Environment variables
+## Configuration
 
 Create a `.env.local` file in the project root.
 
@@ -249,13 +208,13 @@ If your storage root is:
 and one folder inside it is:
 
 ```text
-/run/media/test/files/Photo/TrentinoAltoAdige
+/run/media/test/files/Photo/London
 ```
 
 then from the UI you add:
 
 ```text
-TrentinoAltoAdige
+London
 ```
 
 not the full absolute path.
@@ -275,7 +234,7 @@ not the full absolute path.
 Example relative folder:
 
 ```text
-Vacanze/2024
+London
 ```
 
 ### Upload photos from your computer
@@ -414,12 +373,12 @@ Make sure the file exists under the configured storage root.
 If:
 
 - `storageKey = main`
-- `filePath = TrentinoAltoAdige/20210816_133744.jpg`
+- `filePath = London/20210816_133744.jpg`
 
 then the file must exist here:
 
 ```text
-/run/media/test/files/Photo/TrentinoAltoAdige/20210816_133744.jpg
+/run/media/test/files/Photo/London/20210816_133744.jpg
 ```
 
 ### Filesystem sync finds no photos

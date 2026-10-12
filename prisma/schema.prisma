@@ -16,6 +16,7 @@ model User {
   providerAccounts ProviderAccount[]
   syncFolders      SyncFolder[]
   deletedPhotos    DeletedPhoto[]
+  people           Person[]
 }
 
 model ProviderAccount {
@@ -35,7 +36,7 @@ model ProviderAccount {
 }
 
 model Photo {
-  id               String     @id @default(cuid())
+  id               String          @id @default(cuid())
   userId           String
   originalFilename String
   storageKey       String
@@ -51,11 +52,12 @@ model Photo {
   placeName        String?
   caption          String?
   lastSeenAt       DateTime?
-  missingFromDisk  Boolean    @default(false)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missingFromDisk  Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags             PhotoTag[]
+  faces            FaceDetection[]
 
   @@unique([userId, source, sourceItemId])
   @@unique([userId, storageKey, filePath])
@@ -105,4 +107,41 @@ model DeletedPhoto {
 
   @@unique([userId, storageKey, filePath])
   @@index([userId, storageKey])
+}
+
+model Person {
+  id        String          @id @default(cuid())
+  userId    String
+  name      String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  faces FaceDetection[]
+
+  @@index([userId, name])
+}
+
+model FaceDetection {
+  id            String   @id @default(cuid())
+  photoId        String
+  personId       String?
+  clusterKey     String?
+  faceIndex      Int
+  x              Float
+  y              Float
+  width          Float
+  height         Float
+  confidence     Float?
+  embeddingJson  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  photo  Photo   @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  person Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  @@unique([photoId, faceIndex])
+  @@index([photoId])
+  @@index([personId])
+  @@index([clusterKey])
 }
