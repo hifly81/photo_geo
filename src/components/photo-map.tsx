@@ -28,13 +28,46 @@ export function PhotoMap({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const selectedMarkerRef = useRef<L.Marker | null>(null);
   const onPickLocationRef = useRef(onPickLocation);
+  const frameRef = useRef<number | null>(null);
+  const isMountedRef = useRef(false);
 
   useEffect(() => {
     onPickLocationRef.current = onPickLocation;
   }, [onPickLocation]);
 
+  function cancelScheduledFrame() {
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+  }
+
+  function scheduleMapUpdate(callback: (map: L.Map) => void) {
+    cancelScheduledFrame();
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+
+      const map = mapRef.current;
+      const container = containerRef.current;
+
+      if (!isMountedRef.current || !map || !container || !document.body.contains(container)) {
+        return;
+      }
+
+      try {
+        map.invalidateSize(true);
+        callback(map);
+      } catch {
+        // swallow transient Leaflet timing/layout errors during mount/unmount races
+      }
+    });
+  }
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    isMountedRef.current = true;
 
     const map = L.map(containerRef.current).setView([41.9, 12.5], 4);
 
@@ -51,8 +84,8 @@ export function PhotoMap({
     map.on('click', handleClick);
 
     const resizeObserver = new ResizeObserver(() => {
-      window.requestAnimationFrame(() => {
-        map.invalidateSize(true);
+      scheduleMapUpdate(() => {
+        // invalidate only
       });
     });
 
@@ -62,6 +95,8 @@ export function PhotoMap({
     markersLayerRef.current = markersLayer;
 
     return () => {
+      isMountedRef.current = false;
+      cancelScheduledFrame();
       resizeObserver.disconnect();
 
       if (selectedMarkerRef.current) {
@@ -83,6 +118,7 @@ export function PhotoMap({
 
     if (!map || !markersLayer) return;
 
+    cancelScheduledFrame();
     markersLayer.clearLayers();
 
     if (selectedMarkerRef.current) {
@@ -116,18 +152,16 @@ export function PhotoMap({
           .bindPopup('Selected photo position')
           .addTo(map);
 
-      window.requestAnimationFrame(() => {
-        map.invalidateSize(true);
-        map.setView(selectedLatLng, Math.max(map.getZoom(), 10), { animate: false });
+      scheduleMapUpdate((currentMap) => {
+        currentMap.setView(selectedLatLng, Math.max(currentMap.getZoom(), 10), { animate: false });
       });
 
       return;
     }
 
     if (latLngs.length === 1) {
-      window.requestAnimationFrame(() => {
-        map.invalidateSize(true);
-        map.setView(latLngs[0], 10, { animate: false });
+      scheduleMapUpdate((currentMap) => {
+        currentMap.setView(latLngs[0], 10, { animate: false });
       });
 
       return;
@@ -136,9 +170,8 @@ export function PhotoMap({
     if (latLngs.length > 1) {
       const bounds = L.latLngBounds(latLngs);
 
-      window.requestAnimationFrame(() => {
-        map.invalidateSize(true);
-        map.fitBounds(bounds, { padding: [24, 24], animate: false });
+      scheduleMapUpdate((currentMap) => {
+        currentMap.fitBounds(bounds, { padding: [24, 24], animate: false });
       });
     }
   }, [photos, selectedPhoto, onSelectPhoto]);

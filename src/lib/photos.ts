@@ -5,13 +5,14 @@ import { Prisma } from '@prisma/client';
 type PhotoFilters = {
   from?: string;
   to?: string;
-  country?: string;
+  country?: string | null;
   city?: string;
   tag?: string;
   tags?: string[];
   dateYear?: string;
   dateMonth?: string;
   noDate?: boolean;
+  noCountry?: boolean;
 };
 
 type PhotoListMode =
@@ -23,6 +24,7 @@ type PhotoListMode =
 type CountFilters = PhotoFilters & {
   locationCountry?: string;
   locationCity?: string;
+  locationNoCountry?: boolean;
 };
 
 export type DateTreeMonth = {
@@ -39,6 +41,21 @@ export type DateTreeYear = {
 export type DateTree = {
   years: DateTreeYear[];
   noDateCount: number;
+};
+
+export type LocationTreeCity = {
+  city: string;
+  count: number;
+};
+
+export type LocationTreeCountry = {
+  country: string | null;
+  count: number;
+  cities: LocationTreeCity[];
+};
+
+export type LocationTree = {
+  countries: LocationTreeCountry[];
 };
 
 function buildTagFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['tags'] | undefined {
@@ -110,13 +127,23 @@ function buildTakenAtFilter(filters: PhotoFilters): Prisma.PhotoWhereInput['take
 }
 
 function buildBasePhotoWhere(userId: string, filters: PhotoFilters): Prisma.PhotoWhereInput {
-  return {
+  const where: Prisma.PhotoWhereInput = {
     userId,
     takenAt: buildTakenAtFilter(filters),
-    country: filters.country || undefined,
-    city: filters.city || undefined,
     tags: buildTagFilter(filters)
   };
+
+  if (filters.noCountry) {
+    where.country = null;
+  } else if (filters.country !== undefined) {
+    where.country = filters.country || undefined;
+  }
+
+  if (filters.city) {
+    where.city = filters.city;
+  }
+
+  return where;
 }
 
 function buildPhotoWhere(userId: string, filters: PhotoFilters, mode: PhotoListMode): Prisma.PhotoWhereInput {
@@ -200,8 +227,9 @@ export async function getPhotoCountsForTabs(userId: string, filters: CountFilter
   const byLocationFilters: PhotoFilters = {
     from: filters.from,
     to: filters.to,
-    country: filters.locationCountry || '',
-    city: filters.locationCity || '',
+    country: filters.locationNoCountry ? null : (filters.locationCountry || undefined),
+    city: filters.locationCity || undefined,
+    noCountry: filters.locationNoCountry,
     tag: filters.tag,
     tags: filters.tags,
     dateYear: filters.dateYear,
@@ -209,7 +237,7 @@ export async function getPhotoCountsForTabs(userId: string, filters: CountFilter
     noDate: filters.noDate
   };
 
-  const [all, withGeolocation, missingGeolocation, missingLocationInfo, byLocation] = await Promise.all([
+  const [all, withGeolocation, missingGeolocation, missingLocationInfo] = await Promise.all([
     prisma.photo.count({
       where: buildPhotoWhere(userId, baseFilters, 'all')
     }),
@@ -221,11 +249,12 @@ export async function getPhotoCountsForTabs(userId: string, filters: CountFilter
     }),
     prisma.photo.count({
       where: buildPhotoWhere(userId, baseFilters, 'missing-location-info')
-    }),
-    prisma.photo.count({
-      where: buildPhotoWhere(userId, byLocationFilters, 'all')
     })
   ]);
+
+  const byLocation = await prisma.photo.count({
+    where: buildPhotoWhere(userId, byLocationFilters, 'all')
+  });
 
   return {
     all,
@@ -260,22 +289,27 @@ export async function getAvailableCountries(userId: string, filters: Omit<PhotoF
 
 export async function getAvailableCities(
     userId: string,
-    filters: Omit<PhotoFilters, 'city'> & { country?: string }
+    filters: Omit<PhotoFilters, 'city'> & { country?: string | null; noCountry?: boolean }
 ) {
-  if (!filters.country) {
+  const where: Prisma.PhotoWhereInput = {
+    userId,
+    takenAt: buildTakenAtFilter(filters),
+    tags: buildTagFilter(filters),
+    city: {
+      not: null
+    }
+  };
+
+  if (filters.noCountry) {
+    where.country = null;
+  } else if (filters.country) {
+    where.country = filters.country;
+  } else {
     return [];
   }
 
   const rows = await prisma.photo.findMany({
-    where: {
-      userId,
-      takenAt: buildTakenAtFilter(filters),
-      country: filters.country,
-      tags: buildTagFilter(filters),
-      city: {
-        not: null
-      }
-    },
+    where,
     select: {
       city: true
     },
@@ -292,13 +326,23 @@ export async function getAvailableDateTree(
     userId: string,
     filters: Omit<PhotoFilters, 'dateYear' | 'dateMonth' | 'noDate'>
 ): Promise<DateTree> {
+  const where: Prisma.PhotoWhereInput = {
+    userId,
+    tags: buildTagFilter(filters)
+  };
+
+  if (filters.noCountry) {
+    where.country = null;
+  } else if (filters.country !== undefined) {
+    where.country = filters.country || undefined;
+  }
+
+  if (filters.city) {
+    where.city = filters.city;
+  }
+
   const rows = await prisma.photo.findMany({
-    where: {
-      userId,
-      country: filters.country || undefined,
-      city: filters.city || undefined,
-      tags: buildTagFilter(filters)
-    },
+    where,
     select: {
       takenAt: true
     }
@@ -345,6 +389,69 @@ export async function getAvailableDateTree(
   return {
     years,
     noDateCount
+  };
+}
+
+export async function getAvailableLocationTree(
+    userId: string,
+    filters: Omit<PhotoFilters, 'country' | 'city'>
+): Promise<LocationTree> {
+  const rows = await prisma.photo.findMany({
+    where: {
+      userId,
+      takenAt: buildTakenAtFilter(filters),
+      tags: buildTagFilter(filters)
+    },
+    select: {
+      country: true,
+      city: true
+    },
+    orderBy: [
+      { country: 'asc' },
+      { city: 'asc' }
+    ]
+  });
+
+  const countryMap = new Map<string, Map<string, number>>();
+  const countryCounts = new Map<string, number>();
+  const NO_COUNTRY_KEY = '__NO_COUNTRY__';
+
+  for (const row of rows) {
+    const rawCountry = row.country?.trim();
+    const countryKey = rawCountry && rawCountry.length > 0 ? rawCountry : NO_COUNTRY_KEY;
+
+    countryCounts.set(countryKey, (countryCounts.get(countryKey) ?? 0) + 1);
+
+    if (!countryMap.has(countryKey)) {
+      countryMap.set(countryKey, new Map<string, number>());
+    }
+
+    const city = row.city?.trim();
+    if (!city) continue;
+
+    const cityMap = countryMap.get(countryKey)!;
+    cityMap.set(city, (cityMap.get(city) ?? 0) + 1);
+  }
+
+  const countries = Array.from(countryMap.entries())
+      .sort((a, b) => {
+        if (a[0] === NO_COUNTRY_KEY) return 1;
+        if (b[0] === NO_COUNTRY_KEY) return -1;
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([countryKey, citiesMap]) => ({
+        country: countryKey === NO_COUNTRY_KEY ? null : countryKey,
+        count: countryCounts.get(countryKey) ?? 0,
+        cities: Array.from(citiesMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([city, count]) => ({
+              city,
+              count
+            }))
+      }));
+
+  return {
+    countries
   };
 }
 

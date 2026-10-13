@@ -28,22 +28,46 @@ type DateTreeResponse = {
     noDateCount: number;
 };
 
+type LocationTreeCity = {
+    city: string;
+    count: number;
+};
+
+type LocationTreeCountry = {
+    country: string | null;
+    count: number;
+    cities: LocationTreeCity[];
+};
+
+type LocationTreeResponse = {
+    countries: LocationTreeCountry[];
+};
+
 export type SelectedDateFilter =
     | { mode: 'all' }
     | { mode: 'year'; year: string }
     | { mode: 'month'; year: string; month: string }
     | { mode: 'no-date' };
 
+export type SelectedLocationFilter =
+    | { mode: 'all' }
+    | { mode: 'country'; country: string | null }
+    | { mode: 'city'; country: string | null; city: string };
+
 export function SettingsShell() {
     const [activeSection, setActiveSection] = useState<SettingsSection>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isTagsOpen, setIsTagsOpen] = useState(true);
     const [isDateOpen, setIsDateOpen] = useState(true);
+    const [isLocationOpen, setIsLocationOpen] = useState(true);
     const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [dateTree, setDateTree] = useState<DateTreeResponse>({ years: [], noDateCount: 0 });
+    const [locationTree, setLocationTree] = useState<LocationTreeResponse>({ countries: [] });
     const [expandedYears, setExpandedYears] = useState<string[]>([]);
+    const [expandedCountries, setExpandedCountries] = useState<string[]>([]);
     const [selectedDateFilter, setSelectedDateFilter] = useState<SelectedDateFilter>({ mode: 'all' });
+    const [selectedLocationFilter, setSelectedLocationFilter] = useState<SelectedLocationFilter>({ mode: 'all' });
 
     useEffect(() => {
         async function loadTags() {
@@ -93,6 +117,44 @@ export function SettingsShell() {
         void loadDates();
     }, [selectedTags]);
 
+    useEffect(() => {
+        async function loadLocations() {
+            try {
+                const params = new URLSearchParams();
+
+                if (selectedTags.length > 0) {
+                    params.set('tags', selectedTags.join(','));
+                }
+
+                const query = params.toString();
+                const response = await fetch(query ? `/api/locations?${query}` : '/api/locations');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error ?? 'Failed to load locations');
+                }
+
+                setLocationTree({
+                    countries: data.countries ?? []
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        void loadLocations();
+    }, [selectedTags]);
+
+    useEffect(() => {
+        if (!isSidebarOpen) {
+            setIsTagsOpen(false);
+            setIsDateOpen(false);
+            setIsLocationOpen(false);
+            setExpandedYears([]);
+            setExpandedCountries([]);
+        }
+    }, [isSidebarOpen]);
+
     function toggleTag(tagName: string) {
         setSelectedTags((current) =>
             current.includes(tagName)
@@ -135,6 +197,33 @@ export function SettingsShell() {
         setActiveSection('home');
     }
 
+    function toggleCountryExpanded(countryKey: string) {
+        setExpandedCountries((current) =>
+            current.includes(countryKey)
+                ? current.filter((item) => item !== countryKey)
+                : [...current, countryKey]
+        );
+    }
+
+    function selectAllLocations() {
+        setSelectedLocationFilter({ mode: 'all' });
+        setActiveSection('home');
+    }
+
+    function selectCountry(country: string | null) {
+        setSelectedLocationFilter({ mode: 'country', country });
+        const countryKey = country ?? '__NO_COUNTRY__';
+        setExpandedCountries((current) => (current.includes(countryKey) ? current : [...current, countryKey]));
+        setActiveSection('home');
+    }
+
+    function selectCity(country: string | null, city: string) {
+        setSelectedLocationFilter({ mode: 'city', country, city });
+        const countryKey = country ?? '__NO_COUNTRY__';
+        setExpandedCountries((current) => (current.includes(countryKey) ? current : [...current, countryKey]));
+        setActiveSection('home');
+    }
+
     function isYearSelected(year: string) {
         return selectedDateFilter.mode === 'year' && selectedDateFilter.year === year;
     }
@@ -144,6 +233,18 @@ export function SettingsShell() {
             selectedDateFilter.mode === 'month' &&
             selectedDateFilter.year === year &&
             selectedDateFilter.month === month
+        );
+    }
+
+    function isCountrySelected(country: string | null) {
+        return selectedLocationFilter.mode === 'country' && selectedLocationFilter.country === country;
+    }
+
+    function isCitySelected(country: string | null, city: string) {
+        return (
+            selectedLocationFilter.mode === 'city' &&
+            selectedLocationFilter.country === country &&
+            selectedLocationFilter.city === city
         );
     }
 
@@ -188,6 +289,23 @@ export function SettingsShell() {
             fontWeight: 600,
             textAlign: 'left',
             boxShadow: selected
+                ? '0 0 0 1px rgba(37, 99, 235, 0.08)'
+                : '0 1px 2px rgba(15, 23, 42, 0.04)'
+        }) as const;
+
+    const collapsedIconButtonStyle = (active = false) =>
+        ({
+            width: '100%',
+            minHeight: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 8px',
+            borderRadius: 10,
+            border: active ? '1px solid #2563eb' : '1px solid #d0d5dd',
+            background: active ? '#eff6ff' : '#f8fafc',
+            color: active ? '#1d4ed8' : '#0f172a',
+            boxShadow: active
                 ? '0 0 0 1px rgba(37, 99, 235, 0.08)'
                 : '0 1px 2px rgba(15, 23, 42, 0.04)'
         }) as const;
@@ -285,9 +403,9 @@ export function SettingsShell() {
                         style={navButtonStyle(activeSection === 'home')}
                         title="Home"
                     >
-                        <span aria-hidden="true" style={iconStyle}>
-                            {isSidebarOpen ? '⌂' : 'H'}
-                        </span>
+            <span aria-hidden="true" style={iconStyle}>
+              {isSidebarOpen ? '⌂' : 'H'}
+            </span>
                         {isSidebarOpen ? <span>Home</span> : null}
                     </button>
 
@@ -297,9 +415,9 @@ export function SettingsShell() {
                         style={navButtonStyle(activeSection === 'providers')}
                         title="Providers"
                     >
-                        <span aria-hidden="true" style={iconStyle}>
-                            {isSidebarOpen ? '◎' : 'P'}
-                        </span>
+            <span aria-hidden="true" style={iconStyle}>
+              {isSidebarOpen ? '◎' : 'P'}
+            </span>
                         {isSidebarOpen ? <span>Providers</span> : null}
                     </button>
 
@@ -309,280 +427,467 @@ export function SettingsShell() {
                         style={navButtonStyle(activeSection === 'filesystem-sync')}
                         title="Filesystem sync"
                     >
-                        <span aria-hidden="true" style={iconStyle}>
-                            {isSidebarOpen ? '⇄' : 'F'}
-                        </span>
+            <span aria-hidden="true" style={iconStyle}>
+              {isSidebarOpen ? '⇄' : 'F'}
+            </span>
                         {isSidebarOpen ? <span>Filesystem sync</span> : null}
                     </button>
                 </nav>
 
-                {isSidebarOpen && activeSection === 'home' ? (
-                    <div className="stack" style={{ gap: 10 }}>
-                        <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => setIsTagsOpen((current) => !current)}
-                            aria-expanded={isTagsOpen}
-                            aria-label={isTagsOpen ? 'Collapse Tags section' : 'Expand Tags section'}
-                            style={accordionHeaderStyle}
-                        >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                                <span aria-hidden="true" style={iconStyle}>
-                                    #
-                                </span>
-                                <span>Tags</span>
-                            </span>
-                            <span
-                                aria-hidden="true"
-                                style={{
-                                    ...accordionChevronBaseStyle,
-                                    transform: isTagsOpen ? 'rotate(90deg)' : 'rotate(0deg)'
-                                }}
-                            >
-                                ›
-                            </span>
-                        </button>
-
-                        {isTagsOpen ? (
-                            <div
-                                className="stack"
-                                style={{
-                                    gap: 8,
-                                    paddingLeft: 4
-                                }}
-                            >
+                {activeSection === 'home' ? (
+                    <>
+                        {isSidebarOpen ? (
+                            <div className="stack" style={{ gap: 10 }}>
                                 <button
                                     type="button"
-                                    className={selectedTags.length === 0 ? '' : 'secondary'}
-                                    onClick={clearTags}
-                                    style={{
-                                        textAlign: 'left',
-                                        justifyContent: 'flex-start',
-                                        width: '100%',
-                                        padding: '8px 10px',
-                                        fontSize: 14
-                                    }}
+                                    className="secondary"
+                                    onClick={() => setIsTagsOpen((current) => !current)}
+                                    aria-expanded={isTagsOpen}
+                                    aria-label={isTagsOpen ? 'Collapse Tags section' : 'Expand Tags section'}
+                                    style={accordionHeaderStyle}
                                 >
-                                    All tags
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <span aria-hidden="true" style={iconStyle}>
+                      #
+                    </span>
+                    <span>Tags</span>
+                  </span>
+                                    <span
+                                        aria-hidden="true"
+                                        style={{
+                                            ...accordionChevronBaseStyle,
+                                            transform: isTagsOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+                                        }}
+                                    >
+                    ›
+                  </span>
                                 </button>
 
-                                {availableTags.map((tag) => {
-                                    const selected = selectedTags.includes(tag.name);
-
-                                    return (
+                                {isTagsOpen ? (
+                                    <div className="stack" style={{ gap: 8, paddingLeft: 4 }}>
                                         <button
-                                            key={tag.id}
                                             type="button"
-                                            className={selected ? '' : 'secondary'}
-                                            onClick={() => toggleTag(tag.name)}
+                                            className={selectedTags.length === 0 ? '' : 'secondary'}
+                                            onClick={clearTags}
                                             style={{
                                                 textAlign: 'left',
                                                 justifyContent: 'flex-start',
                                                 width: '100%',
                                                 padding: '8px 10px',
-                                                fontSize: 14,
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
+                                                fontSize: 14
                                             }}
-                                            title={tag.name}
                                         >
-                                            {selected ? '✓ ' : ''}
-                                            {tag.name}
+                                            All tags
                                         </button>
-                                    );
-                                })}
-                            </div>
-                        ) : null}
 
-                        <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => setIsDateOpen((current) => !current)}
-                            aria-expanded={isDateOpen}
-                            aria-label={isDateOpen ? 'Collapse Date section' : 'Expand Date section'}
-                            style={accordionHeaderStyle}
-                        >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                                <span aria-hidden="true" style={iconStyle}>
-                                    ◷
-                                </span>
-                                <span>Date</span>
-                            </span>
-                            <span
-                                aria-hidden="true"
-                                style={{
-                                    ...accordionChevronBaseStyle,
-                                    transform: isDateOpen ? 'rotate(90deg)' : 'rotate(0deg)'
-                                }}
-                            >
-                                ›
-                            </span>
-                        </button>
+                                        {availableTags.map((tag) => {
+                                            const selected = selectedTags.includes(tag.name);
 
-                        {isDateOpen ? (
-                            <div
-                                className="stack"
-                                style={{
-                                    gap: 8,
-                                    paddingLeft: 4
-                                }}
-                            >
-                                <button
-                                    type="button"
-                                    className={selectedDateFilter.mode === 'all' ? '' : 'secondary'}
-                                    onClick={selectAllDates}
-                                    style={{
-                                        textAlign: 'left',
-                                        justifyContent: 'flex-start',
-                                        width: '100%',
-                                        padding: '8px 10px',
-                                        fontSize: 14
-                                    }}
-                                >
-                                    All dates
-                                </button>
-
-                                {dateTree.years.map((item) => {
-                                    const expanded = expandedYears.includes(item.year);
-                                    const selected = isYearSelected(item.year);
-
-                                    return (
-                                        <div key={item.year} className="stack" style={{ gap: 4 }}>
-                                            <div
-                                                style={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: '28px minmax(0, 1fr)',
-                                                    gap: 6,
-                                                    alignItems: 'stretch'
-                                                }}
-                                            >
+                                            return (
                                                 <button
-                                                    type="button"
-                                                    className="secondary"
-                                                    onClick={() => toggleYearExpanded(item.year)}
-                                                    aria-label={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
-                                                    title={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
-                                                    style={{
-                                                        padding: 0,
-                                                        minWidth: 28,
-                                                        width: 28,
-                                                        height: 36,
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontWeight: 700,
-                                                        lineHeight: 1
-                                                    }}
-                                                >
-                                                    {expanded ? '−' : '+'}
-                                                </button>
-
-                                                <button
+                                                    key={tag.id}
                                                     type="button"
                                                     className={selected ? '' : 'secondary'}
-                                                    onClick={() => selectYear(item.year)}
+                                                    onClick={() => toggleTag(tag.name)}
                                                     style={{
                                                         textAlign: 'left',
-                                                        justifyContent: 'space-between',
+                                                        justifyContent: 'flex-start',
                                                         width: '100%',
                                                         padding: '8px 10px',
                                                         fontSize: 14,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 8
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
                                                     }}
-                                                    title={item.year}
+                                                    title={tag.name}
                                                 >
-                                                    <span
-                                                        style={{
-                                                            minWidth: 0,
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            whiteSpace: 'nowrap'
-                                                        }}
-                                                    >
-                                                        {selected ? '✓ ' : ''}
-                                                        {item.year}
-                                                    </span>
-                                                    <span className="small" style={countTextStyle}>
-                                                        {item.count}
-                                                    </span>
+                                                    {selected ? '✓ ' : ''}
+                                                    {tag.name}
                                                 </button>
-                                            </div>
-
-                                            {expanded ? (
-                                                <div className="stack" style={{ gap: 4, paddingLeft: 34 }}>
-                                                    {item.months.map((month) => {
-                                                        const monthSelected = isMonthSelected(item.year, month.month);
-
-                                                        return (
-                                                            <button
-                                                                key={`${item.year}-${month.month}`}
-                                                                type="button"
-                                                                className={monthSelected ? '' : 'secondary'}
-                                                                onClick={() => selectMonth(item.year, month.month)}
-                                                                style={{
-                                                                    textAlign: 'left',
-                                                                    justifyContent: 'space-between',
-                                                                    width: '100%',
-                                                                    padding: '8px 10px',
-                                                                    fontSize: 14,
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 8
-                                                                }}
-                                                                title={`${item.year}-${month.month}`}
-                                                            >
-                                                                <span
-                                                                    style={{
-                                                                        minWidth: 0,
-                                                                        overflow: 'hidden',
-                                                                        textOverflow: 'ellipsis',
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}
-                                                                >
-                                                                    {monthSelected ? '✓ ' : ''}
-                                                                    {formatMonth(month.month)}
-                                                                </span>
-                                                                <span className="small" style={countTextStyle}>
-                                                                    {month.count}
-                                                                </span>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
 
                                 <button
                                     type="button"
-                                    className={selectedDateFilter.mode === 'no-date' ? '' : 'secondary'}
-                                    onClick={selectNoDate}
-                                    style={{
-                                        textAlign: 'left',
-                                        justifyContent: 'space-between',
-                                        width: '100%',
-                                        padding: '8px 10px',
-                                        fontSize: 14,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}
+                                    className="secondary"
+                                    onClick={() => setIsDateOpen((current) => !current)}
+                                    aria-expanded={isDateOpen}
+                                    aria-label={isDateOpen ? 'Collapse Date section' : 'Expand Date section'}
+                                    style={accordionHeaderStyle}
                                 >
-                                    <span>
-                                        {selectedDateFilter.mode === 'no-date' ? '✓ ' : ''}
-                                        No date
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <span aria-hidden="true" style={iconStyle}>
+                      ◷
+                    </span>
+                    <span>Date</span>
+                  </span>
+                                    <span
+                                        aria-hidden="true"
+                                        style={{
+                                            ...accordionChevronBaseStyle,
+                                            transform: isDateOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+                                        }}
+                                    >
+                    ›
+                  </span>
+                                </button>
+
+                                {isDateOpen ? (
+                                    <div className="stack" style={{ gap: 8, paddingLeft: 4 }}>
+                                        <button
+                                            type="button"
+                                            className={selectedDateFilter.mode === 'all' ? '' : 'secondary'}
+                                            onClick={selectAllDates}
+                                            style={{
+                                                textAlign: 'left',
+                                                justifyContent: 'flex-start',
+                                                width: '100%',
+                                                padding: '8px 10px',
+                                                fontSize: 14
+                                            }}
+                                        >
+                                            All dates
+                                        </button>
+
+                                        {dateTree.years.map((item) => {
+                                            const expanded = expandedYears.includes(item.year);
+                                            const selected = isYearSelected(item.year);
+
+                                            return (
+                                                <div key={item.year} className="stack" style={{ gap: 4 }}>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: '28px minmax(0, 1fr)',
+                                                            gap: 6,
+                                                            alignItems: 'stretch'
+                                                        }}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="secondary"
+                                                            onClick={() => toggleYearExpanded(item.year)}
+                                                            aria-label={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
+                                                            title={expanded ? `Collapse ${item.year}` : `Expand ${item.year}`}
+                                                            style={{
+                                                                padding: 0,
+                                                                minWidth: 28,
+                                                                width: 28,
+                                                                height: 36,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontWeight: 700,
+                                                                lineHeight: 1
+                                                            }}
+                                                        >
+                                                            {expanded ? '−' : '+'}
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            className={selected ? '' : 'secondary'}
+                                                            onClick={() => selectYear(item.year)}
+                                                            style={{
+                                                                textAlign: 'left',
+                                                                justifyContent: 'space-between',
+                                                                width: '100%',
+                                                                padding: '8px 10px',
+                                                                fontSize: 14,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 8
+                                                            }}
+                                                            title={item.year}
+                                                        >
+                              <span
+                                  style={{
+                                      minWidth: 0,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                  }}
+                              >
+                                {selected ? '✓ ' : ''}
+                                  {item.year}
+                              </span>
+                                                            <span className="small" style={countTextStyle}>
+                                {item.count}
+                              </span>
+                                                        </button>
+                                                    </div>
+
+                                                    {expanded ? (
+                                                        <div className="stack" style={{ gap: 4, paddingLeft: 34 }}>
+                                                            {item.months.map((month) => {
+                                                                const monthSelected = isMonthSelected(item.year, month.month);
+
+                                                                return (
+                                                                    <button
+                                                                        key={`${item.year}-${month.month}`}
+                                                                        type="button"
+                                                                        className={monthSelected ? '' : 'secondary'}
+                                                                        onClick={() => selectMonth(item.year, month.month)}
+                                                                        style={{
+                                                                            textAlign: 'left',
+                                                                            justifyContent: 'space-between',
+                                                                            width: '100%',
+                                                                            padding: '8px 10px',
+                                                                            fontSize: 14,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: 8
+                                                                        }}
+                                                                        title={`${item.year}-${month.month}`}
+                                                                    >
+                                    <span
+                                        style={{
+                                            minWidth: 0,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                      {monthSelected ? '✓ ' : ''}
+                                        {formatMonth(month.month)}
                                     </span>
-                                    <span className="small" style={countTextStyle}>
-                                        {dateTree.noDateCount}
+                                                                        <span className="small" style={countTextStyle}>
+                                      {month.count}
                                     </span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })}
+
+                                        <button
+                                            type="button"
+                                            className={selectedDateFilter.mode === 'no-date' ? '' : 'secondary'}
+                                            onClick={selectNoDate}
+                                            style={{
+                                                textAlign: 'left',
+                                                justifyContent: 'space-between',
+                                                width: '100%',
+                                                padding: '8px 10px',
+                                                fontSize: 14,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8
+                                            }}
+                                        >
+                      <span>
+                        {selectedDateFilter.mode === 'no-date' ? '✓ ' : ''}
+                          No date
+                      </span>
+                                            <span className="small" style={countTextStyle}>
+                        {dateTree.noDateCount}
+                      </span>
+                                        </button>
+                                    </div>
+                                ) : null}
+
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={() => setIsLocationOpen((current) => !current)}
+                                    aria-expanded={isLocationOpen}
+                                    aria-label={isLocationOpen ? 'Collapse By location section' : 'Expand By location section'}
+                                    style={accordionHeaderStyle}
+                                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <span aria-hidden="true" style={iconStyle}>
+                      ⌖
+                    </span>
+                    <span>By location</span>
+                  </span>
+                                    <span
+                                        aria-hidden="true"
+                                        style={{
+                                            ...accordionChevronBaseStyle,
+                                            transform: isLocationOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+                                        }}
+                                    >
+                    ›
+                  </span>
+                                </button>
+
+                                {isLocationOpen ? (
+                                    <div className="stack" style={{ gap: 8, paddingLeft: 4 }}>
+                                        <button
+                                            type="button"
+                                            className={selectedLocationFilter.mode === 'all' ? '' : 'secondary'}
+                                            onClick={selectAllLocations}
+                                            style={{
+                                                textAlign: 'left',
+                                                justifyContent: 'flex-start',
+                                                width: '100%',
+                                                padding: '8px 10px',
+                                                fontSize: 14
+                                            }}
+                                        >
+                                            All locations
+                                        </button>
+
+                                        {locationTree.countries.map((item) => {
+                                            const countryKey = item.country ?? '__NO_COUNTRY__';
+                                            const countryLabel = item.country ?? 'No country';
+                                            const expanded = expandedCountries.includes(countryKey);
+                                            const selected = isCountrySelected(item.country);
+
+                                            return (
+                                                <div key={countryKey} className="stack" style={{ gap: 4 }}>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: '28px minmax(0, 1fr)',
+                                                            gap: 6,
+                                                            alignItems: 'stretch'
+                                                        }}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="secondary"
+                                                            onClick={() => toggleCountryExpanded(countryKey)}
+                                                            aria-label={expanded ? `Collapse ${countryLabel}` : `Expand ${countryLabel}`}
+                                                            title={expanded ? `Collapse ${countryLabel}` : `Expand ${countryLabel}`}
+                                                            style={{
+                                                                padding: 0,
+                                                                minWidth: 28,
+                                                                width: 28,
+                                                                height: 36,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontWeight: 700,
+                                                                lineHeight: 1
+                                                            }}
+                                                        >
+                                                            {expanded ? '−' : '+'}
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            className={selected ? '' : 'secondary'}
+                                                            onClick={() => selectCountry(item.country)}
+                                                            style={{
+                                                                textAlign: 'left',
+                                                                justifyContent: 'space-between',
+                                                                width: '100%',
+                                                                padding: '8px 10px',
+                                                                fontSize: 14,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 8
+                                                            }}
+                                                            title={countryLabel}
+                                                        >
+                              <span
+                                  style={{
+                                      minWidth: 0,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                  }}
+                              >
+                                {selected ? '✓ ' : ''}
+                                  {countryLabel}
+                              </span>
+                                                            <span className="small" style={countTextStyle}>
+                                {item.count}
+                              </span>
+                                                        </button>
+                                                    </div>
+
+                                                    {expanded ? (
+                                                        <div className="stack" style={{ gap: 4, paddingLeft: 34 }}>
+                                                            {item.cities.map((city) => {
+                                                                const citySelected = isCitySelected(item.country, city.city);
+
+                                                                return (
+                                                                    <button
+                                                                        key={`${countryKey}-${city.city}`}
+                                                                        type="button"
+                                                                        className={citySelected ? '' : 'secondary'}
+                                                                        onClick={() => selectCity(item.country, city.city)}
+                                                                        style={{
+                                                                            textAlign: 'left',
+                                                                            justifyContent: 'space-between',
+                                                                            width: '100%',
+                                                                            padding: '8px 10px',
+                                                                            fontSize: 14,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: 8
+                                                                        }}
+                                                                        title={`${countryLabel} - ${city.city}`}
+                                                                    >
+                                    <span
+                                        style={{
+                                            minWidth: 0,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                      {citySelected ? '✓ ' : ''}
+                                        {city.city}
+                                    </span>
+                                                                        <span className="small" style={countTextStyle}>
+                                      {city.count}
+                                    </span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <div className="stack" style={{ gap: 8 }}>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={() => setActiveSection('home')}
+                                    title="Tags"
+                                    aria-label="Tags"
+                                    style={collapsedIconButtonStyle(selectedTags.length > 0)}
+                                >
+                                    <span aria-hidden="true" style={iconStyle}>#</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={() => setActiveSection('home')}
+                                    title="Date"
+                                    aria-label="Date"
+                                    style={collapsedIconButtonStyle(selectedDateFilter.mode !== 'all')}
+                                >
+                                    <span aria-hidden="true" style={iconStyle}>◷</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={() => setActiveSection('home')}
+                                    title="By location"
+                                    aria-label="By location"
+                                    style={collapsedIconButtonStyle(selectedLocationFilter.mode !== 'all')}
+                                >
+                                    <span aria-hidden="true" style={iconStyle}>⌖</span>
                                 </button>
                             </div>
-                        ) : null}
-                    </div>
+                        )}
+                    </>
                 ) : null}
             </aside>
 
@@ -591,6 +896,7 @@ export function SettingsShell() {
                     <HomePage
                         selectedTags={selectedTags}
                         selectedDateFilter={selectedDateFilter}
+                        selectedLocationFilter={selectedLocationFilter}
                     />
                 ) : null}
                 {activeSection === 'providers' ? <IntegrationsPanel /> : null}

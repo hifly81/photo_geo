@@ -7,7 +7,9 @@ import {
   mapPhotosForClient
 } from '@/lib/photos';
 import { photoFiltersSchema } from '@/lib/validators';
-import { getCurrentUser } from '@/lib/auth';
+import { requireCurrentUser } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 const allowedModes = new Set([
   'all',
@@ -17,7 +19,7 @@ const allowedModes = new Set([
 ]);
 
 export async function GET(request: NextRequest) {
-  const user = await getCurrentUser();
+  const user = await requireCurrentUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -35,6 +37,7 @@ export async function GET(request: NextRequest) {
   const modeParam = request.nextUrl.searchParams.get('mode') ?? 'all';
   const locationCountry = request.nextUrl.searchParams.get('locationCountry') ?? '';
   const locationCity = request.nextUrl.searchParams.get('locationCity') ?? '';
+  const locationNoCountry = request.nextUrl.searchParams.get('locationNoCountry') === 'true';
   const tagsParam = request.nextUrl.searchParams.get('tags') ?? '';
   const dateYear = request.nextUrl.searchParams.get('dateYear') ?? '';
   const dateMonth = request.nextUrl.searchParams.get('dateMonth') ?? '';
@@ -55,14 +58,15 @@ export async function GET(request: NextRequest) {
       : 'all';
 
   const effectiveFilters =
-      locationCountry || locationCity
+      locationNoCountry || locationCountry || locationCity
           ? {
             ...parseResult.data,
             tags: selectedTags,
             dateYear: dateYear || undefined,
             dateMonth: dateMonth || undefined,
             noDate: noDate === 'true',
-            country: locationCountry || undefined,
+            noCountry: locationNoCountry,
+            country: locationNoCountry ? null : (locationCountry || undefined),
             city: locationCity || undefined
           }
           : {
@@ -82,7 +86,8 @@ export async function GET(request: NextRequest) {
       dateMonth: dateMonth || undefined,
       noDate: noDate === 'true',
       locationCountry,
-      locationCity
+      locationCity,
+      locationNoCountry
     }),
     getAvailableCountries(user.id, {
       from: parseResult.data.from,
@@ -101,7 +106,8 @@ export async function GET(request: NextRequest) {
       dateYear: dateYear || undefined,
       dateMonth: dateMonth || undefined,
       noDate: noDate === 'true',
-      country: locationCountry || undefined
+      country: locationNoCountry ? null : (locationCountry || undefined),
+      noCountry: locationNoCountry
     })
   ]);
 
