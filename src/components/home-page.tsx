@@ -656,10 +656,7 @@ export function HomePage({
 
   return (
       <main className="container stack">
-        <div>
-          <h1>Photo Geo</h1>
-          <p>Upload photos, place them on a map, edit metadata, and search by place or time.</p>
-        </div>
+
 
         {error && <div className="card error-banner">{error}</div>}
         {successMessage && <div className="card success-banner">{successMessage}</div>}
