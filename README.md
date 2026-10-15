@@ -10,7 +10,7 @@ It is built for people who want a better way to manage photo archives without gi
 
 
   <div align="center">
-    <video src="https://github.com/hifly81/photo_geo/blob/main/media/demo.mp4" width="100%" controls autoplay muted loop>
+    <video src="https://github.com/hifly81/photo_geo/raw/refs/heads/main/media/demo.mp4" width="100%" controls autoplay muted loop>
     </video>
   </div>
 
