@@ -1,19 +1,59 @@
 # Photo Geo
 
-Photo Geo is an app to organize, browse, and edit photos using a map-based workflow.
+Photo Geo helps you **import, sync, geolocate, tag, search, and edit photos** through a visual workflow centered around **places, coordinates.**.
 
-It lets you:
+It is built for people who want a better way to manage photo archives without giving up control of their files.
 
-- upload and synchronize photos
-- catalog photos that already exist on your filesystem
-- browse your collection on a map
-- edit metadata and coordinates
-- tag and search photos
-- connect external providers such as *Google Photos* and *Amazon Photos*
+---
+
+## Demo
+
+
+  <div align="center">
+    <video src="https://github.com/hifly81/photo_geo/blob/main/media/demo.mp4" width="100%" controls autoplay muted loop>
+    </video>
+  </div>
+
+
+---
+
+## Why Photo Geo
+
+Most photo tools push you toward one of two extremes:
+
+- cloud-first products that take control away from your file structure
+- large DAM-style tools that feel too heavy for personal archives
+
+Photo Geo aims for a better middle ground:
+
+- 🧭 **Browse visually on a map**
+- 🏷️ **Enrich photos with metadata and tags**
+- 📍 **Manage coordinates and place information**
+- ☁️ **Optionally import from external providers**
+- 🏠 **Stay self-managed**
+
+If your library already exists on disk and you want a fast, practical, map-based catalog on top of it, Photo Geo is built for that workflow.
+
+---
+
+## Highlights
+
+- 🗺️ **Map-first browsing** for exploring photos by location
+- 📂 **Filesystem sync** without duplicating existing files
+- ✍️ **Metadata editing** for captions, dates, tags, and coordinates
+- 🔎 **Search and filtering** across location and completeness states
+- 🌍 **Place-based organization** by country, city, and place
+- 🔌 **Provider integrations** such as Google Photos and Amazon Photos
+- 🧱 **Lightweight stack** powered by SQLite and Prisma
 
 ---
 
 ## Quick Start
+
+### Requirements
+
+- Node.js
+- npm
 
 ### 1. Install dependencies
 
@@ -21,7 +61,7 @@ It lets you:
 npm install
 ```
 
-### 2. Configure environment
+### 2. Configure environment variables
 
 Create a `.env.local` file in the project root:
 
@@ -31,7 +71,7 @@ PHOTO_DEFAULT_STORAGE_KEY=main
 PHOTO_UPLOAD_STORAGE_KEY=main
 ```
 
-If you want to enable external providers, also configure their credentials:
+Optional provider credentials:
 
 ```bash
 GOOGLE_CLIENT_ID=your-client-id
@@ -65,137 +105,46 @@ http://localhost:3000
 
 ### 6. Sign in and add photos
 
-You can then:
+After signing in with a username, you can:
 
-- sign in with any username
-- upload photos from your browser
-- open **Filesystem sync**
-- add folders relative to the configured storage root
+- upload photos from the browser
+- add folders via **Filesystem sync**
 - run sync and browse your catalog
 
 ---
 
-## What Photo Geo does
+## How it works
 
 Photo Geo combines:
 
-- a photo metadata catalog stored in SQLite through Prisma
-- photos already existing on your filesystem
-- optional provider integrations
+- a metadata catalog stored in **SQLite**
+- **Prisma** for schema and data access
+- references to photos already available on your filesystem
+- optional external provider integrations
 
-The app is designed for the case where your photo files already exist in a real folder structure and you want a usable catalog and map interface on top of them.
-
-Photo Geo stores:
+It stores information such as:
 
 - filename
 - storage root key
 - relative file path
-- tags
 - timestamps
+- tags
 - geolocation
-- descriptive fields such as country, city, and place
+- country, city, and place metadata
 
-Photo Geo does not need to move or duplicate filesystem-synced files.
-
----
-
-
-## Requirements
-
-- Node.js
-- npm
-- a valid Prisma/SQLite setup
-- access to the folders you want to scan
-- correct filesystem permissions for the user running the app
-
-Supported image formats:
-
-- `.jpg`
-- `.jpeg`
-- `.png`
-- `.webp`
-- `.gif`
+For filesystem-synced photos, Photo Geo does **not** need to move or duplicate your files.
 
 ---
 
-## Configuration
+## Typical workflow
 
-Create a `.env.local` file in the project root.
-
-### Minimum configuration
-
-```bash
-PHOTO_STORAGE_ROOTS='{"main":"/run/media/test/files/Photo"}'
-PHOTO_DEFAULT_STORAGE_KEY=main
-PHOTO_UPLOAD_STORAGE_KEY=main
-```
-
-### Optional provider configuration
-
-```bash
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/providers/google/callback
-
-AMAZON_CLIENT_ID=your-client-id
-AMAZON_CLIENT_SECRET=your-client-secret
-AMAZON_REDIRECT_URI=http://localhost:3000/api/providers/amazon/callback
-AMAZON_PHOTOS_API_BASE_URL=https://photos.amazon.com/api/v1
-```
-
----
-
-## Installation
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Generate Prisma client:
-
-```bash
-npx prisma generate
-```
-
-Create or update the schema:
-
-```bash
-npx prisma db push
-```
-
-Optional: seed demo data
-
-```bash
-npm run seed
-```
-
-Start the app:
-
-```bash
-npm run dev
-```
-
-Run tests:
-
-```bash
-npm test
-```
-
----
-
-## First-time setup
-
-After the app starts:
-
-1. Sign in with a username
-2. Open the **Filesystem sync** section
-3. Add one or more folders relative to your configured storage root
-4. Run sync
-5. Open the photo list and map
-6. Review and edit metadata
-7. Optionally connect Google Photos or Amazon Photos
+1. Configure one or more storage roots
+2. Sign in with a username
+3. Add folders relative to the configured root
+4. Run filesystem sync
+5. Browse your collection in the list and on the map
+6. Edit metadata, tags, and coordinates
+7. Optionally connect external providers and import content
 
 Example:
 
@@ -205,13 +154,13 @@ If your storage root is:
 /run/media/test/files/Photo
 ```
 
-and one folder inside it is:
+and a folder inside it is:
 
 ```text
 /run/media/test/files/Photo/London
 ```
 
-then from the UI you add:
+then in the UI you should add:
 
 ```text
 London
@@ -221,78 +170,33 @@ not the full absolute path.
 
 ---
 
-## Common tasks
+## Main features
 
-### Add photos that already exist on disk
+### 🗺️ Map-based browsing
 
-1. Open **Filesystem sync**
-2. Click **Open**
-3. Add a folder path relative to the configured root
-4. Click **Run sync for all enabled folders** or **Sync this folder**
-5. Open the photo list
+Photo Geo makes the map a primary interface for exploring your archive, instead of treating geolocation as a secondary filter.
 
-Example relative folder:
+### 📂 Filesystem sync
 
-```text
-London
-```
+Index photos that already exist on disk without moving them into a separate managed storage layer.
 
-### Upload photos from your computer
+### ✍️ Metadata editing
 
-1. Go to the Home page
-2. Use drag and drop or file selection
-3. Submit the upload
-4. Wait for the upload summary
+Update:
 
-### Browse photos by place
+- captions
+- dates
+- coordinates
+- country
+- city
+- place
+- tags
 
-1. Open the **By location** tab
-2. Select a country
-3. Select a city
-4. Browse the filtered results
+If multiple photos are selected, location updates can be applied across the whole selection.
 
-### Edit a photo
+### 🔎 Search and filtering
 
-1. Select a photo in the list
-2. Use the **Edit photo** panel
-3. Change caption, date, location, or tags
-4. Save changes
-
-### Set a photo position from the map
-
-1. Select a photo
-2. Click on the map
-3. The selected coordinates are applied to the current photo
-4. Save if needed
-
-### Connect Google Photos
-
-1. Open **Providers**
-2. Click **Open**
-3. Select **Google Photos**
-4. Click **Connect**
-5. Complete the provider flow
-
-### Connect Amazon Photos
-
-1. Open **Providers**
-2. Click **Open**
-3. Select **Amazon Photos**
-4. Click **Connect**
-5. Complete the provider flow
-
----
-
-## Photo list and navigation
-
-The photo list is paginated.
-
-- maximum 100 photos per page
-- no infinite scrolling
-- explicit page navigation
-- filters work together with pagination
-
-Tabs include:
+Browse across views such as:
 
 - All photos
 - With geolocation
@@ -300,41 +204,32 @@ Tabs include:
 - Missing location info
 - By location
 
----
+The photo list is paginated, with up to 100 photos per page.
 
-## Map and metadata editing
+### 🔌 Providers
 
-You can:
-
-- select a photo from the list
-- edit caption and date
-- edit coordinates manually
-- click on the map to set coordinates
-- edit country, city, and place
-- add or remove tags
-
-If multiple photos are selected, location changes can be applied to the full selection.
-
----
-
-## Providers
-
-The **Providers** section is collapsible.
-
-It supports external media providers such as:
+Photo Geo can optionally connect to:
 
 - Google Photos
 - Amazon Photos
 
-From there you can connect a provider, browse available items, and import them into Photo Geo.
+From the **Providers** section, you can connect a provider, browse items, and import them into your library.
 
 ---
 
-## Filesystem sync
+## Supported image formats
 
-The **Filesystem sync** section is collapsible.
+- `.jpg`
+- `.jpeg`
+- `.png`
+- `.webp`
+- `.gif`
 
-From there you can:
+---
+
+## Filesystem sync notes
+
+The **Filesystem sync** section allows you to:
 
 - add folders to scan
 - enable or disable configured folders
@@ -342,7 +237,7 @@ From there you can:
 - run sync for a single folder
 - review sync output
 
-The app stores references to files already on disk.
+Photo Geo stores references to files already present on disk.
 
 It does not duplicate filesystem-synced files into another storage location.
 
@@ -350,17 +245,15 @@ It does not duplicate filesystem-synced files into another storage location.
 
 ## Duplicate handling
 
-Photo Geo treats filesystem photos as references to physical files.
+For filesystem-based photos, identity is based on:
 
-This means:
+- user
+- storage root
+- relative file path
 
-- two different file paths can exist even if the file contents are identical
-- photo identity is based on:
-    - user
-    - storage root
-    - relative file path
+This means two different paths can exist even if the contents are identical.
 
-Uploads may still be deduplicated according to current upload logic.
+Uploads may still be deduplicated according to the current upload logic.
 
 ---
 
@@ -375,7 +268,7 @@ If:
 - `storageKey = main`
 - `filePath = London/20210816_133744.jpg`
 
-then the file must exist here:
+then the file must exist at:
 
 ```text
 /run/media/test/files/Photo/London/20210816_133744.jpg
@@ -394,9 +287,9 @@ Check:
 
 Check that:
 
-- photos actually have country and city metadata
+- photos have country and city metadata
 - sync completed correctly
-- filters are not narrowing results unexpectedly
+- active filters are not too restrictive
 
 ### Provider connection fails
 
@@ -406,6 +299,14 @@ Verify:
 - client secret
 - redirect URI
 - provider-side app configuration
+
+---
+
+## Contributing
+
+Contributions, ideas, and feedback are welcome.
+
+If you care about self-managed photo archives, map-based exploration, and practical metadata workflows, feel free to open an issue or start a discussion.
 
 ---
 

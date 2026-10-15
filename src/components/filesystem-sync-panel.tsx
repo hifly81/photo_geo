@@ -454,36 +454,47 @@ function ConfiguredFolderTreeItem({
                         : '1px solid #f2f4f7'
                 }}
             >
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <div className="row" style={{ gap: 10, alignItems: 'flex-start', minWidth: 0, flex: 1 }}>
-                        {hasChildren ? (
-                            <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => onToggle(node.path)}
-                                style={iconButtonStyle}
+                <div
+                    className="row"
+                    style={{
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 12,
+                        flexWrap: 'wrap'
+                    }}
+                >
+                    <div className="row" style={{ gap: 10, alignItems: 'center', minWidth: 0, flex: 1 }}>
+                        <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => onToggle(node.path)}
+                            style={iconButtonStyle}
+                        >
+                            <span
+                                style={{
+                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.18s ease',
+                                    display: 'inline-flex'
+                                }}
                             >
-                                <span
-                                    style={{
-                                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                        transition: 'transform 0.18s ease',
-                                        display: 'inline-flex'
-                                    }}
-                                >
-                                    <IconChevronRight />
-                                </span>
-                            </button>
-                        ) : (
-                            <span style={{ display: 'inline-block', width: 28 }} />
-                        )}
+                                <IconChevronRight />
+                            </span>
+                        </button>
 
-                        <span style={{ color: folder?.enabled ? '#f79009' : '#98a2b3', marginTop: 4, display: 'inline-flex' }}>
+                        <span style={{ color: folder?.enabled ? '#f79009' : '#98a2b3', display: 'inline-flex' }}>
                             {hasChildren && isExpanded ? <IconFolderOpen /> : <IconFolder />}
                         </span>
 
+                        <strong style={{ color: '#101828', wordBreak: 'break-word' }}>
+                            {node.path || '/'}
+                        </strong>
+                    </div>
+                </div>
+
+                {isExpanded ? (
+                    <div style={{ marginTop: 12 }}>
                         <div className="stack" style={{ gap: 4, minWidth: 0 }}>
                             <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <strong style={{ color: '#101828', wordBreak: 'break-word' }}>{node.path || '/'}</strong>
                                 {folder ? (
                                     <span
                                         className="small"
@@ -512,52 +523,52 @@ function ConfiguredFolderTreeItem({
                                 <div style={mutedTextStyle}>Parent folder</div>
                             )}
                         </div>
-                    </div>
 
-                    {isConfigured ? (
-                        <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <div
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    padding: '6px 8px',
-                                    border: '1px solid #eaecf0',
-                                    borderRadius: 999,
-                                    background: '#fff'
-                                }}
-                            >
-                                <ToggleSwitch
-                                    checked={Boolean(folder?.enabled)}
-                                    onChange={() => folder && onToggleFolder(folder)}
-                                    label={folder?.enabled ? 'Disable sync' : 'Enable sync'}
-                                />
+                        {isConfigured ? (
+                            <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+                                <div
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '6px 8px',
+                                        border: '1px solid #eaecf0',
+                                        borderRadius: 999,
+                                        background: '#fff'
+                                    }}
+                                >
+                                    <ToggleSwitch
+                                        checked={Boolean(folder?.enabled)}
+                                        onChange={() => folder && onToggleFolder(folder)}
+                                        label={folder?.enabled ? 'Disable sync' : 'Enable sync'}
+                                    />
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={() => folder && onRunSync(folder)}
+                                    disabled={syncing || !folder?.enabled}
+                                    style={roundActionButtonStyle}
+                                    aria-label="Sync folder now"
+                                    title="Sync folder now"
+                                >
+                                    <IconRefresh />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="danger"
+                                    onClick={() => folder && onDeleteFolder(folder.id)}
+                                    style={roundActionButtonStyle}
+                                    aria-label="Remove folder"
+                                    title="Remove folder"
+                                >
+                                    <IconTrash />
+                                </button>
                             </div>
-
-                            <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => folder && onRunSync(folder)}
-                                disabled={syncing || !folder?.enabled}
-                                style={roundActionButtonStyle}
-                                aria-label="Sync folder now"
-                                title="Sync folder now"
-                            >
-                                <IconRefresh />
-                            </button>
-
-                            <button
-                                type="button"
-                                className="danger"
-                                onClick={() => folder && onDeleteFolder(folder.id)}
-                                style={roundActionButtonStyle}
-                                aria-label="Remove folder"
-                                title="Remove folder"
-                            >
-                                <IconTrash />
-                            </button>
-                        </div>
-                    ) : null}
-                </div>
+                        ) : null}
+                    </div>
+                ) : null}
             </div>
 
             {hasChildren && isExpanded ? (
@@ -901,9 +912,6 @@ export function FilesystemSyncPanel() {
         <section className="card stack">
             <div>
                 <h2 style={{ marginBottom: 4 }}>Filesystem sync</h2>
-                <p className="small">
-                    Browse folders with a tree view, enable or disable sync with a switch, and manage configured folders more easily.
-                </p>
             </div>
 
             <div id="filesystem-sync-panel-content" className="stack" style={{ gap: 16 }}>
@@ -947,9 +955,6 @@ export function FilesystemSyncPanel() {
                         </div>
                     </div>
 
-                    <div style={{ ...mutedTextStyle, marginTop: 10 }}>
-                        The main sync scans all enabled folders. You can also run sync on a single folder directly from the tree.
-                    </div>
                 </div>
 
                 {error ? <div className="card error-banner">{error}</div> : null}
@@ -999,10 +1004,6 @@ export function FilesystemSyncPanel() {
                                     onClick={() => void loadAvailableDirectories()}
                                 />
                             </label>
-
-                            <div style={mutedTextStyle}>
-                                Select a path relative to the configured storage root. Subfolders are scanned recursively.
-                            </div>
 
                             <div className="small" style={{ color: '#027a48', fontWeight: 600 }}>
                                 Tip: click directly on a folder in the tree to add it and start sync immediately.
@@ -1084,9 +1085,6 @@ export function FilesystemSyncPanel() {
                     <div style={panelCardStyle} className="stack">
                         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <h3 style={sectionTitleStyle}>Configured folders</h3>
-                            <span style={mutedTextStyle}>
-                                Enable or disable sync directly from the tree.
-                            </span>
                         </div>
 
                         {folders.length === 0 && !loading ? (
