@@ -473,6 +473,35 @@ export function HomePage({
         setCurrentPage(1);
     }, [selectedDateFilter]);
 
+    useEffect(() => {
+        if (photoListTab === 'all' && counts.all === 0) {
+            if (counts.withGeolocation > 0) {
+                setPhotoListTab('with-geolocation');
+                return;
+            }
+            if (counts.missingGeolocation > 0) {
+                setPhotoListTab('missing-geolocation');
+                return;
+            }
+            if (counts.missingLocationInfo > 0) {
+                setPhotoListTab('missing-location-info');
+                return;
+            }
+        }
+
+        if (photoListTab === 'with-geolocation' && counts.withGeolocation === 0) {
+            setPhotoListTab('all');
+        }
+
+        if (photoListTab === 'missing-geolocation' && counts.missingGeolocation === 0) {
+            setPhotoListTab('all');
+        }
+
+        if (photoListTab === 'missing-location-info' && counts.missingLocationInfo === 0) {
+            setPhotoListTab('all');
+        }
+    }, [photoListTab, counts]);
+
     function openEditor(photo?: PhotoRecord) {
         if (photo) {
             setSelectedPhoto(photo);
@@ -891,12 +920,7 @@ export function HomePage({
             <div className="stack">
                 <section className="card stack">
                     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                        <div>
-                            <h2 style={{ marginBottom: 4 }}>Map</h2>
-                            <div className="small">
-                                Use the controls to open/close the map and change how much vertical space it uses.
-                            </div>
-                        </div>
+
 
                         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                             <button type="button" className="secondary" onClick={decreaseMapHeight} disabled={!isMapOpen || mapHeight <= minMapHeight} aria-label="Smaller map" title="Smaller map" style={mapIconButtonStyle}>
@@ -949,19 +973,17 @@ export function HomePage({
                     >
                         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                                {renderTabButton('all', 'All photos', counts.all)}
-                                {renderTabButton('with-geolocation', 'With geolocation', counts.withGeolocation)}
-                                {renderTabButton('missing-geolocation', 'Without geolocation', counts.missingGeolocation)}
-                                {renderTabButton('missing-location-info', 'Missing location info', counts.missingLocationInfo)}
+                                {counts.all > 0 ? renderTabButton('all', 'All photos', counts.all) : null}
+                                {counts.withGeolocation > 0 ? renderTabButton('with-geolocation', 'With geolocation', counts.withGeolocation) : null}
+                                {counts.missingGeolocation > 0 ? renderTabButton('missing-geolocation', 'Without geolocation', counts.missingGeolocation) : null}
+                                {counts.missingLocationInfo > 0 ? renderTabButton('missing-location-info', 'Missing location info', counts.missingLocationInfo) : null}
                             </div>
 
                             <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="small">
                   Active tags: {selectedTags.length > 0 ? selectedTags.join(', ') : 'none'}
                 </span>
-                                <span className="small">
-                  Person filter: {selectedPersonId ? 'named person' : selectedClusterKey ? 'unnamed cluster' : 'none'}
-                </span>
+
                                 <span className="small">Selected: {selectedPhotosCount}</span>
                                 <button
                                     type="button"
@@ -1008,9 +1030,7 @@ export function HomePage({
                             </div>
                         </div>
 
-                        <div className="small">
-                            Click to select one photo. Shift + click extends a range, Ctrl/Cmd + click toggles photos. Double click opens the editor.
-                        </div>
+
 
                         <div
                             className="row"
