@@ -8,12 +8,16 @@ It is built for people who want a better way to manage photo archives without gi
 
 ## Demo
 
-
+<details>
+ <summary style="cursor: pointer;">
+    <h3 style="display: inline; color: #0366d6;">🎥 Click to watch a demo</h3>
+  </summary>
+  <br>
   <div align="center">
     <video src="https://github.com/hifly81/photo_geo/raw/refs/heads/main/media/demo.mp4" width="100%" controls autoplay muted loop>
     </video>
   </div>
-
+</details>
 
 ---
 
