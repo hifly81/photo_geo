@@ -8,9 +8,7 @@ It is built for people who want a better way to manage photo archives without gi
 
 ## Demo
 
-
 https://github.com/user-attachments/assets/c7330986-f3cd-47a3-b8c2-ac7758f5b8a5
-
 
 ---
 
@@ -33,24 +31,28 @@ If your library already exists on disk and you want a fast, practical, map-based
 
 ---
 
-## Highlights
-
-- 🗺️ **Map-first browsing** for exploring photos by location
-- 📂 **Filesystem sync** without duplicating existing files
-- ✍️ **Metadata editing** for captions, dates, tags, and coordinates
-- 🔎 **Search and filtering** across location and completeness states
-- 🌍 **Place-based organization** by country, city, and place
-- 🔌 **Provider integrations** such as Google Photos and Amazon Photos
-- 🧱 **Lightweight stack** powered by SQLite and Prisma
-
----
-
-## Quick Start
+## Installation
 
 ### Requirements
 
 - Node.js
 - npm
+
+### 0. Clone the repository
+
+Clone the repository from GitHub:
+
+```bash
+git clone https://github.com/hifly81/photogeo.git
+cd photogeo
+```
+
+If you are working from your own fork, clone your fork instead:
+
+```bash
+git clone https://github.com/<your-username>/photogeo.git
+cd photogeo
+```
 
 ### 1. Install dependencies
 
@@ -60,7 +62,9 @@ npm install
 
 ### 2. Configure environment variables
 
-Create a `.env.local` file in the project root:
+Create a `.env.local` file in the project root.
+
+#### Required variables
 
 ```bash
 PHOTO_STORAGE_ROOTS='{"main":"/run/media/test/files/Photo"}'
@@ -68,7 +72,9 @@ PHOTO_DEFAULT_STORAGE_KEY=main
 PHOTO_UPLOAD_STORAGE_KEY=main
 ```
 
-Optional provider credentials:
+#### Optional provider credentials
+
+Set these only if you want to enable external provider integrations.
 
 ```bash
 GOOGLE_CLIENT_ID=your-client-id
@@ -81,6 +87,44 @@ AMAZON_REDIRECT_URI=http://localhost:3000/api/providers/amazon/callback
 AMAZON_PHOTOS_API_BASE_URL=https://photos.amazon.com/api/v1
 ```
 
+#### Environment variable reference
+
+- `PHOTO_STORAGE_ROOTS`  
+  JSON object that defines available photo storage locations by key.
+
+  Example:
+
+  ```bash
+  PHOTO_STORAGE_ROOTS='{"main":"/run/media/test/files/Photo","archive":"/mnt/archive/photos"}'
+  ```
+
+- `PHOTO_DEFAULT_STORAGE_KEY`  
+  Storage key used by default when reading or browsing photos.
+
+- `PHOTO_UPLOAD_STORAGE_KEY`  
+  Storage key used for uploaded files.
+
+- `GOOGLE_CLIENT_ID`  
+  OAuth client ID for Google integration.
+
+- `GOOGLE_CLIENT_SECRET`  
+  OAuth client secret for Google integration.
+
+- `GOOGLE_REDIRECT_URI`  
+  OAuth callback URL for Google.
+
+- `AMAZON_CLIENT_ID`  
+  OAuth client ID for Amazon integration.
+
+- `AMAZON_CLIENT_SECRET`  
+  OAuth client secret for Amazon integration.
+
+- `AMAZON_REDIRECT_URI`  
+  OAuth callback URL for Amazon.
+
+- `AMAZON_PHOTOS_API_BASE_URL`  
+  Base API URL for Amazon Photos.
+
 ### 3. Prepare the database
 
 ```bash
@@ -88,19 +132,49 @@ npx prisma generate
 npx prisma db push
 ```
 
-### 4. Start the app
+### 4. Run tests
+
+Run the full test suite:
+
+```bash
+npm test
+```
+
+If the project supports a watch mode, you can also use:
+
+```bash
+npm run test:watch
+```
+
+### 5. Start the app in development
 
 ```bash
 npm run dev
 ```
 
-### 5. Open the app
+This starts the application with development settings and hot reload.
+
+### 6. Start the app in production
+
+First build the application:
+
+```bash
+npm run build
+```
+
+Then start it in production mode:
+
+```bash
+npm run start
+```
+
+### 7. Open the app
 
 ```text
 http://localhost:3000
 ```
 
-### 6. Sign in and add photos
+### 8. Sign in and add photos
 
 After signing in with a username, you can:
 
@@ -130,40 +204,6 @@ It stores information such as:
 - country, city, and place metadata
 
 For filesystem-synced photos, Photo Geo does **not** need to move or duplicate your files.
-
----
-
-## Typical workflow
-
-1. Configure one or more storage roots
-2. Sign in with a username
-3. Add folders relative to the configured root
-4. Run filesystem sync
-5. Browse your collection in the list and on the map
-6. Edit metadata, tags, and coordinates
-7. Optionally connect external providers and import content
-
-Example:
-
-If your storage root is:
-
-```text
-/run/media/test/files/Photo
-```
-
-and a folder inside it is:
-
-```text
-/run/media/test/files/Photo/London
-```
-
-then in the UI you should add:
-
-```text
-London
-```
-
-not the full absolute path.
 
 ---
 
@@ -221,36 +261,6 @@ From the **Providers** section, you can connect a provider, browse items, and im
 - `.png`
 - `.webp`
 - `.gif`
-
----
-
-## Filesystem sync notes
-
-The **Filesystem sync** section allows you to:
-
-- add folders to scan
-- enable or disable configured folders
-- run sync for all enabled folders
-- run sync for a single folder
-- review sync output
-
-Photo Geo stores references to files already present on disk.
-
-It does not duplicate filesystem-synced files into another storage location.
-
----
-
-## Duplicate handling
-
-For filesystem-based photos, identity is based on:
-
-- user
-- storage root
-- relative file path
-
-This means two different paths can exist even if the contents are identical.
-
-Uploads may still be deduplicated according to the current upload logic.
 
 ---
 
